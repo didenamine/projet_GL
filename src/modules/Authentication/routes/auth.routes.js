@@ -2,10 +2,10 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import { validate } from "../../../shared/middlewares/validate.js";
 import { authenticateToken } from "../../../shared/middlewares/auth.middleware.js";
-import { 
-  studentSignupSchema, 
-  companySupervisorSignupSchema, 
-  universitySupervisorSignupSchema, 
+import {
+  studentSignupSchema,
+  companySupervisorSignupSchema,
+  universitySupervisorSignupSchema,
   loginSchema,
   passwordResetRequestSchema,
   passwordResetSchema
@@ -17,7 +17,7 @@ const router = express.Router();
 // Rate limiting configurations
 const signupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,
+  max: 100,
   message: { message: "Too many signup attempts from this IP, please try again later." },
   standardHeaders: true,
   legacyHeaders: false
@@ -25,7 +25,7 @@ const signupLimiter = rateLimit({
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
+  max: 500,
   message: { message: "Too many login attempts from this IP, please try again later." },
   standardHeaders: true,
   legacyHeaders: false
@@ -33,15 +33,16 @@ const loginLimiter = rateLimit({
 
 const verificationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5,
+  max: 500,
   message: { message: "Too many verification attempts from this IP, please try again later." },
   standardHeaders: true,
   legacyHeaders: false
 });
 
 const passwordResetLimiter = rateLimit({
+  //change it to now stop me from testing
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3,
+  max: 100,
   message: { message: "Too many password reset attempts from this IP, please try again later." },
   standardHeaders: true,
   legacyHeaders: false

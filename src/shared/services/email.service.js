@@ -52,8 +52,7 @@ export const sendVerificationEmail = async ({ to, userName, verificationToken })
 
 export const sendPasswordResetEmail = async ({ to, userName, resetToken }) => {
   try {
-    const resetLink = `${FRONTEND_URL}/api/auth/reset-password?resetToken=${resetToken}`;
-
+    const resetLink = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
     const htmlContent = generateResetPasswordEmailTemplate({
       userName,
       resetLink

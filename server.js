@@ -11,14 +11,14 @@ import teamCRouter from './src/modules/Team_C/index.js';
 import teamDRouter from './src/modules/Team_D/index.js';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './src/shared/config/swagger.js';
-
+import cors from "cors";
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(logger('combined'));
-
+app.use(cors());
 await connectDB();
 
 // Swagger UI at /docs
