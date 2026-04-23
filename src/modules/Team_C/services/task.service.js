@@ -7,6 +7,7 @@ import TaskValidator from "../models/taskValidator.model.js"
 import TaskHistory from "../models/taskHistory.model.js"
 import Sprint from "../../Team_A/models/sprint.model.js"
 import ValidatorFactory from "../../../validators/ValidatorFactory.js"
+import TaskStateManager from "../../../states/TaskStateManager.js"
 
 async function verifyUserStoryExists(userStoryId) {
   const userStory = await UserStory.findById(userStoryId);
@@ -144,11 +145,10 @@ export const updateTaskStatus = async (id, data) => {
     error.status = 404;
     throw error;
   }
-  if (task.status === data.status) {
-    const error = new Error("Task is already in this status.");
-    error.status = 400;
-    throw error;
-  }
+
+  // Validate transition without mutating persisted task before supervisor validation.
+  TaskStateManager.transition({ status: task.status }, data.status);
+
   const taskValidator = await TaskValidator.create({
     taskId: id,
     taskStatus: data.status, // This is the proposed new status
@@ -186,7 +186,7 @@ export const validateTaskStatus = async (id, data, validatorRole) => {
 
   if (data.validatorStatus === "valid") {
     const oldStatus = task.status;
-    task.status = taskValidator.taskStatus;
+    TaskStateManager.transition(task, taskValidator.taskStatus);
     await task.save();
 
     await TaskHistory.create({
