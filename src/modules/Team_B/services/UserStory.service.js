@@ -5,26 +5,29 @@ import Project from "../../Team_A/models/project.model.js";
 
 import Student from "../../Authentication/models/student.model.js";
 import Task from "../../Team_C/models/task.model.js"
+
+import { TaskFactory } from "../../../factories/TaskFactory.js";
+
 // 📌 CREATE USER STORY
 
-export const createUserStory = async (data , studentId) => {
+export const createUserStory = async (data, studentId) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const {storyName,description ,priority,storyPointEstimate,startDate,dueDate,sprintId} = data;
+    const { storyName, description, priority, storyPointEstimate, startDate, dueDate, sprintId } = data;
 
     /** ----------------------------------------------------
      * 1. Validate that the student has a project
      * ---------------------------------------------------- */
     const student = await Student.findById(studentId).session(session);
-        
+
     if (!student) {
-          const error = new Error("Student not found");
-          error.statusCode = 404;
-          throw error;
-        }
- 
+      const error = new Error("Student not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
 
     if (!student.project) {
       const error = new Error("Student has no assigned project");
@@ -65,30 +68,14 @@ export const createUserStory = async (data , studentId) => {
       throw error;
     }
 
-    /** --------------------
-     * 4. Validate dates
-     * -------------------- */
-    const start = new Date(startDate);
-    const due = new Date(dueDate);
-
-    if (due <= start) {
-      const error = new Error("Due date must be after start date");
-      error.statusCode = 400;
-      throw error;
-    }
-
-
-    /** ----------------------------
-     * 5. Create User Story
-     * ---------------------------- */
-    const newUserStory = new UserStory({
+    const newUserStory = TaskFactory.createUserStory({
       storyName,
       description,
       priority,
       storyPointEstimate,
-      startDate: start,
-      dueDate: due,
-      sprintId
+      startDate,
+      dueDate,
+      sprintId,
     });
 
     const savedStory = await newUserStory.save({ session });
@@ -133,12 +120,12 @@ export const getUserStories = async (projectId) => {
   try {
 
     if (!projectId) {
-          return res.status(StatusCodes.NOT_FOUND).json({
-            success: false,
-            message: "No project assigned to your account"
-          });
-        }
-        
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: "No project assigned to your account"
+      });
+    }
+
     // 1️⃣ Vérifier que le projet existe
     const project = await Project.findOne({ _id: projectId, deletedAt: null }).populate({
       path: 'sprints',
@@ -170,11 +157,11 @@ export const getUserStories = async (projectId) => {
       sprintId: { $in: sprintIds },
       deletedAt: null
     })
-    .populate({
-      path: 'sprintId',
-      select: 'title'
-    })
-    .sort({ startDate: 1 }); // optionnel : trier par date de début
+      .populate({
+        path: 'sprintId',
+        select: 'title'
+      })
+      .sort({ startDate: 1 }); // optionnel : trier par date de début
 
     return {
       success: true,
@@ -195,7 +182,7 @@ export const getUserStoriesRelatedToSprint = async (projectId, sprintId) => {
   /** 1️⃣ Vérifier que l'étudiant a un projet */
   if (!projectId) {
     const error = new Error("No project assigned to your account");
-    error.statusCode= 404;
+    error.statusCode = 404;
     throw error;
   }
 
@@ -204,14 +191,14 @@ export const getUserStoriesRelatedToSprint = async (projectId, sprintId) => {
 
   if (!sprint || sprint.deletedAt) {
     const error = new Error("Sprint not found or deleted");
-    error.statusCode= 404;
+    error.statusCode = 404;
     throw error;
   }
 
   /** 3️⃣ Vérifier que le sprint appartient bien au projet */
   if (String(sprint.projectId) !== String(projectId)) {
     const error = new Error("Sprint does not belong to your project");
-    error.statusCode= 403;
+    error.statusCode = 403;
     throw error;
   }
 
@@ -234,7 +221,7 @@ export const getUserStoriesRelatedToSprint = async (projectId, sprintId) => {
 
   return {
     success: true,
-    message: "User stories retrieved successfully", 
+    message: "User stories retrieved successfully",
     data: {
       sprint: {
         _id: sprintId,
@@ -249,11 +236,11 @@ export const getUserStoriesRelatedToSprint = async (projectId, sprintId) => {
 };
 
 // get US by ID
-export const getUserStoryByID = async (userStoryId , projectId ) => {
+export const getUserStoryByID = async (userStoryId, projectId) => {
   /** 1️⃣ Vérifier que l'étudiant a un projet */
   if (!projectId) {
     const error = new Error("1️⃣ No project assigned to your account");
-    error.statusCode= 404;
+    error.statusCode = 404;
     throw error;
   }
 
@@ -265,22 +252,22 @@ export const getUserStoryByID = async (userStoryId , projectId ) => {
 
   if (!userStory) {
     const error = new Error("User Story not found or deleted");
-    error.statusCode= 404;
+    error.statusCode = 404;
     throw error;
   }
 
   /** 3️⃣ Vérifier que le sprint auquel elle appartient existe */
-  const sprint = await Sprint.findById(userStory.sprintId ).lean();
+  const sprint = await Sprint.findById(userStory.sprintId).lean();
   if (!sprint || sprint.deletedAt) {
     const error = new Error("3️⃣ Sprint not found or deleted");
-    error.statusCode= 404;
+    error.statusCode = 404;
     throw error;
   }
 
   /** 4️⃣ Vérifier que le sprint appartient bien au projet de l'étudiant */
   if (String(sprint.projectId) !== String(projectId)) {
     const error = new Error(" 4️⃣ Sprint does not belong to your project");
-    error.statusCode= 403;
+    error.statusCode = 403;
     throw error;
   }
 
@@ -509,7 +496,7 @@ export const deleteUserStory = async (userStoryId, studentId) => {
 
     if (!userStory) {
       const error = new Error("User story not found or already deleted");
-      error.statusCode= 404;
+      error.statusCode = 404;
       throw error;
     }
 
@@ -520,13 +507,13 @@ export const deleteUserStory = async (userStoryId, studentId) => {
 
     if (!student) {
       const error = new Error("Student not found");
-      error.statusCode= 404;
+      error.statusCode = 404;
       throw error;
     }
 
     if (!student.project) {
       const error = new Error("Student has no assigned project");
-      error.statusCode= 400;
+      error.statusCode = 400;
       throw error;
     }
 
@@ -540,17 +527,17 @@ export const deleteUserStory = async (userStoryId, studentId) => {
 
     if (!sprint) {
       const error = new Error("Sprint not found");
-      error.statusCode= 404;
+      error.statusCode = 404;
       throw error;
     }
 
     if (String(sprint.projectId) !== String(student.project)) {
       const error = new Error("User story does not belong to your project");
-      error.statusCode= 403;
+      error.statusCode = 403;
       throw error;
     }
     /** 4️⃣ Get all task IDs */
-    const taskIds = userStory.tasks; 
+    const taskIds = userStory.tasks;
 
     /** 5️⃣ HARD DELETE tasks */
     const deletedTasksResult = await Task.deleteMany(
