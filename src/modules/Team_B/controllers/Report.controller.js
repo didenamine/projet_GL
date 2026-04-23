@@ -1,3 +1,4 @@
+import { projectFacade } from "../../facades/index.js";
 import * as reportService from "../services/Report.service.js";
 import { StatusCodes } from "http-status-codes";
 
@@ -13,11 +14,7 @@ export const createReport = async (req, res, next) => {
       });
     }
 
-    const result = await reportService.createReport(
-      studentId,
-      req.validatedBody,
-      req.file  
-    );
+    const result = await projectFacade.generateReport(undefined, req.validatedBody, studentId, req.file);
 
     res.status(StatusCodes.CREATED).json(result);
   } catch (error) {

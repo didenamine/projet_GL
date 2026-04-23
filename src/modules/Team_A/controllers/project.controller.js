@@ -1,3 +1,4 @@
+import { projectFacade } from "../../facades/index.js";
 import * as projectService from "../services/project.service.js";
 import { StatusCodes } from "http-status-codes";
 
@@ -6,7 +7,7 @@ export const createProject = async (req, res, next) => {
     const projectData = req.validatedBody;
     const studentId = req.student.id;
     
-    const result = await projectService.createProject(projectData, studentId);
+    const result = await projectFacade.bootstrapProject(projectData, studentId);
     
     res.status(StatusCodes.CREATED).json({
       success: result.success,
