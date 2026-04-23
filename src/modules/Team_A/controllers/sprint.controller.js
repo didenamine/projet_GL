@@ -1,3 +1,4 @@
+import { projectFacade } from "../../facades/index.js";
 import * as sprintService from "../services/sprint.service.js";
 import { StatusCodes } from "http-status-codes";
 
@@ -6,7 +7,7 @@ export const createSprint = async (req, res, next) => {
     const sprintData = req.validatedBody;
     const studentId = req.student.id;
 
-    const result = await sprintService.createSprint(sprintData, studentId);
+    const result = await projectFacade.addSprint(undefined, sprintData, studentId);
 
     res.status(StatusCodes.CREATED).json({
       success: result.success,

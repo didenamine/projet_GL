@@ -1,4 +1,5 @@
 import * as taskService from "../services/task.service.js";
+import { projectFacade } from "../../facades/index.js";
 import CompSupervisor from "../../Authentication/models/compSupervisor.model.js";
 import UniSupervisor from "../../Authentication/models/uniSupervisor.model.js";
 
@@ -10,7 +11,7 @@ export const createTask = async (req, res) => {
       return res.status(400).json({ message: "Title, userStoryId, and status are required." });
     }
 
-    const task = await taskService.createTask(req.body);
+    const task = await projectFacade.assignTask(userStoryId, req.body);
     res.status(201).json({ message: "Task created successfully", task });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
@@ -144,7 +145,7 @@ export const updateTaskStatus = async (req, res) => {
     if (!id) {
       return res.status(400).json({ message: "Task ID is required." });
     }
-    const task = await taskService.updateTaskStatus(id, req.body);
+    const task = await projectFacade.validateTask(id, req.body, req.user.id);
     res.status(200).json({ message: "Task updated successfully and waiting for validation", task });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
