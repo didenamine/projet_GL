@@ -5,9 +5,10 @@ import { StatusCodes } from "http-status-codes";
 export const createValidation = async (req, res, next) => {
   try {
     const validatorId = req.supervisor.id; // Enc_Company / Enc_University
+    const validatorRole = req.user.role; // "CompSupervisor" | "UniSupervisor"
     const data = req.body;
 
-    const result = await validationService.createValidation(data, validatorId);
+    const result = await validationService.createValidation(data, validatorId, validatorRole);
 
     if (!result.success) {
       return res.status(result.code).json({

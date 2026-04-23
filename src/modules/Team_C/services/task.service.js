@@ -6,6 +6,7 @@ import UserStory from "../../Team_B/models/UserStory.model.js"
 import TaskValidator from "../models/taskValidator.model.js"
 import TaskHistory from "../models/taskHistory.model.js"
 import Sprint from "../../Team_A/models/sprint.model.js"
+import ValidatorFactory from "../../../validators/ValidatorFactory.js"
 
 async function verifyUserStoryExists(userStoryId) {
   const userStory = await UserStory.findById(userStoryId);
@@ -160,7 +161,7 @@ export const updateTaskStatus = async (id, data) => {
 };
 
 //function that allows the supervisor to validate the status of the task
-export const validateTaskStatus = async (id, data) => {
+export const validateTaskStatus = async (id, data, validatorRole) => {
   const taskValidator = await TaskValidator.findById(id);
   if (!taskValidator) {
     const error = new Error("Task validator not found.");
@@ -171,6 +172,15 @@ export const validateTaskStatus = async (id, data) => {
   if (!task) {
     const error = new Error("Task not found.");
     error.status = 404;
+    throw error;
+  }
+
+  // Check authorization
+  const validator = ValidatorFactory.get(validatorRole, data.validatorId);
+  const canValidate = await validator.canValidate(task._id, data.validatorId);
+  if (!canValidate) {
+    const error = new Error("You are not authorized to validate this task.");
+    error.status = 403;
     throw error;
   }
 
