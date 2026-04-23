@@ -24,7 +24,10 @@ class EventBus {
     await Promise.all(
       [...observers].map((observer) =>
         Promise.resolve(observer.notify(eventName, payload)).catch((err) =>
-          console.error(`[EventBus] Error in observer:`, err),
+          console.error(
+            `[EventBus] Error in observer for "${eventName}":`,
+            err,
+          ),
         ),
       ),
     );

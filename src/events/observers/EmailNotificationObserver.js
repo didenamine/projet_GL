@@ -1,9 +1,7 @@
 import { IEmailObserver } from "../interfaces/IEmailObserver.js";
-
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
-  // ❌ supprimer resendVerificationEmail
 } from "../../shared/services/email.service.js";
 
 export class EmailNotificationObserver extends IEmailObserver {
@@ -12,20 +10,35 @@ export class EmailNotificationObserver extends IEmailObserver {
       case "USER_REGISTERED":
         await sendVerificationEmail({
           to: payload.user.email,
-          userName: payload.user.name,
+          userName: payload.user.fullName,
           verificationToken: payload.user.verificationToken,
         });
+        console.log(
+          `[EmailObserver] Verification email sent to ${payload.user.email}`,
+        );
         break;
 
       case "PASSWORD_RESET_REQUESTED":
         await sendPasswordResetEmail({
           to: payload.user.email,
-          userName: payload.user.name,
+          userName: payload.user.fullName,
           resetToken: payload.resetToken,
         });
+        console.log(
+          `[EmailObserver] Password reset email sent to ${payload.user.email}`,
+        );
         break;
 
-      // ❌ supprimer le case "EMAIL_VERIFICATION_REQUESTED" entier
+      case "EMAIL_VERIFICATION_REQUESTED":
+        await sendVerificationEmail({
+          to: payload.user.email,
+          userName: payload.user.fullName,
+          verificationToken: payload.user.verificationToken,
+        });
+        console.log(
+          `[EmailObserver] Verification email resent to ${payload.user.email}`,
+        );
+        break;
 
       default:
         console.warn(`[EmailObserver] Unknown event: ${eventName}`);

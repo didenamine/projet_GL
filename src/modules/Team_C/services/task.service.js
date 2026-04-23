@@ -6,6 +6,8 @@ import UserStory from "../../Team_B/models/UserStory.model.js"
 import TaskValidator from "../models/taskValidator.model.js"
 import TaskHistory from "../models/taskHistory.model.js"
 import Sprint from "../../Team_A/models/sprint.model.js"
+import ValidatorFactory from "../../../validators/ValidatorFactory.js"
+import TaskStateManager from "../../../states/TaskStateManager.js"
 
 async function verifyUserStoryExists(userStoryId) {
   const userStory = await UserStory.findById(userStoryId);
@@ -143,11 +145,10 @@ export const updateTaskStatus = async (id, data) => {
     error.status = 404;
     throw error;
   }
-  if (task.status === data.status) {
-    const error = new Error("Task is already in this status.");
-    error.status = 400;
-    throw error;
-  }
+
+  // Validate transition without mutating persisted task before supervisor validation.
+  TaskStateManager.transition({ status: task.status }, data.status);
+
   const taskValidator = await TaskValidator.create({
     taskId: id,
     taskStatus: data.status, // This is the proposed new status
@@ -160,7 +161,7 @@ export const updateTaskStatus = async (id, data) => {
 };
 
 //function that allows the supervisor to validate the status of the task
-export const validateTaskStatus = async (id, data) => {
+export const validateTaskStatus = async (id, data, validatorRole) => {
   const taskValidator = await TaskValidator.findById(id);
   if (!taskValidator) {
     const error = new Error("Task validator not found.");
@@ -174,9 +175,18 @@ export const validateTaskStatus = async (id, data) => {
     throw error;
   }
 
+  // Check authorization
+  const validator = ValidatorFactory.get(validatorRole, data.validatorId);
+  const canValidate = await validator.canValidate(task._id, data.validatorId);
+  if (!canValidate) {
+    const error = new Error("You are not authorized to validate this task.");
+    error.status = 403;
+    throw error;
+  }
+
   if (data.validatorStatus === "valid") {
     const oldStatus = task.status;
-    task.status = taskValidator.taskStatus;
+    TaskStateManager.transition(task, taskValidator.taskStatus);
     await task.save();
 
     await TaskHistory.create({

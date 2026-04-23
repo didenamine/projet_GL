@@ -8,6 +8,7 @@ import UniSupervisor from "../../Authentication/models/uniSupervisor.model.js";
 
 import fs from "fs";
 import path from "path";
+import { ProjectFactory } from "../../../factories/ProjectFactory.js";
 
 /** ========================================
  * CREATE REPORT
@@ -89,13 +90,13 @@ export const createReport = async (studentId, data, file) => {
     savedFilePath = fullPath; // Garder pour cleanup
 
     /** ----------------------------------------------------
-     * 5. Create the report
+     * 5. Create the report — Factory Method pattern (GoF p.107)
      * ---------------------------------------------------- */
-    const newReport = new Report({
+    const newReport = ProjectFactory.createReport({
       versionLabel,
       notes,
-      filePath, // ✅ Maintenant défini
-      projectId
+      filePath,
+      projectId,
     });
 
     const savedReport = await newReport.save({ session });

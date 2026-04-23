@@ -9,9 +9,9 @@ import { hashPassword, comparePassword } from "../utils/hash.js";
 import { signAccessToken, signRefreshToken } from "../utils/jwt.js";
 import { generateVerificationToken } from "../utils/generateToken.js";
 
-// J'ai supprimer cet import et le remplacer par la ligne suivante
-/*import { sendVerificationEmail, sendPasswordResetEmail } from "../../../shared/services/email.service.js";*/
+// ── Pattern Observer (Membre 5) : suppression du couplage direct email ──
 import EventBus from "../../../events/EventBus.js";
+// ────────────────────────────────────────────────────────────────────────
 
 export const registerStudent = async (userData) => {
   const session = await mongoose.startSession();
@@ -51,19 +51,16 @@ export const registerStudent = async (userData) => {
     }
 
     const existingUniSupervisor = await User.findById(uniSupervisorId);
-
     if (!existingUniSupervisor) {
       const error = new Error("University supervisor does not exist");
       error.status = 404;
       throw error;
     }
-
     if (existingUniSupervisor.role !== "UniSupervisor") {
       const error = new Error("Invalid university supervisor");
       error.status = 400;
       throw error;
     }
-
     if (!existingUniSupervisor.isVerified) {
       const error = new Error("University supervisor must be verified");
       error.status = 400;
@@ -71,19 +68,16 @@ export const registerStudent = async (userData) => {
     }
 
     const existingCompSupervisorUser = await User.findById(compSupervisorId);
-
     if (!existingCompSupervisorUser) {
       const error = new Error("Company supervisor does not exist");
       error.status = 404;
       throw error;
     }
-
     if (existingCompSupervisorUser.role !== "CompSupervisor") {
       const error = new Error("Invalid company supervisor");
       error.status = 400;
       throw error;
     }
-
     if (!existingCompSupervisorUser.isVerified) {
       const error = new Error("Company supervisor must be verified");
       error.status = 400;
@@ -93,7 +87,6 @@ export const registerStudent = async (userData) => {
     const existingCompSupervisor = await CompSupervisor.findOne({
       userId: compSupervisorId,
     });
-
     if (!existingCompSupervisor) {
       const error = new Error("Company supervisor profile not found");
       error.status = 404;
@@ -115,7 +108,6 @@ export const registerStudent = async (userData) => {
     }
 
     const hashedPassword = await hashPassword(password);
-
     const verificationToken = generateVerificationToken();
 
     const newUser = new User({
@@ -158,16 +150,12 @@ export const registerStudent = async (userData) => {
     await session.commitTransaction();
     session.endSession();
 
-    // je vais supprimer la fonction sendVerificationEmail (couplage fort) et la remplacer par EventBus
+    // ── Observer : publish au lieu d'appel direct email ──
     try {
       await EventBus.publish("USER_REGISTERED", { user: savedUser });
-
       console.log(`✅ Verification email sent to ${savedUser.email}`);
     } catch (emailError) {
-      console.error(
-        `⚠️ Failed to send verification email to ${savedUser.email}:`,
-        emailError.message,
-      );
+      console.error(`⚠️ Email error: ${emailError.message}`);
     }
 
     return {
@@ -190,7 +178,6 @@ export const registerStudent = async (userData) => {
 export const registerCompanySupervisor = async (userData) => {
   const session = await mongoose.startSession();
   session.startTransaction();
-
   try {
     const { fullName, email, phoneNumber, password, companyName, badgeIMG } =
       userData;
@@ -198,7 +185,6 @@ export const registerCompanySupervisor = async (userData) => {
     const existingUser = await User.findOne({
       $or: [{ email }, { phoneNumber }],
     });
-
     if (existingUser) {
       const error = new Error(
         "User already exists with this email or phone number",
@@ -208,7 +194,6 @@ export const registerCompanySupervisor = async (userData) => {
     }
 
     const hashedPassword = await hashPassword(password);
-
     const verificationToken = generateVerificationToken();
 
     const newUser = new User({
@@ -230,24 +215,15 @@ export const registerCompanySupervisor = async (userData) => {
     });
 
     await newCompSupervisor.save({ session });
-
     await session.commitTransaction();
     session.endSession();
 
-    // Send verification email (non-blocking)
+    // ── Observer : publish au lieu d'appel direct email ──
     try {
-      await sendVerificationEmail({
-        to: savedUser.email,
-        userName: savedUser.fullName,
-        verificationToken: savedUser.verificationToken,
-      });
+      await EventBus.publish("USER_REGISTERED", { user: savedUser });
       console.log(`✅ Verification email sent to ${savedUser.email}`);
     } catch (emailError) {
-      console.error(
-        `⚠️ Failed to send verification email to ${savedUser.email}:`,
-        emailError.message,
-      );
-      // Don't throw error - registration was successful, email is secondary
+      console.error(`⚠️ Email error: ${emailError.message}`);
     }
 
     return {
@@ -270,14 +246,12 @@ export const registerCompanySupervisor = async (userData) => {
 export const registerUniversitySupervisor = async (userData) => {
   const session = await mongoose.startSession();
   session.startTransaction();
-
   try {
     const { fullName, email, phoneNumber, password, badgeIMG } = userData;
 
     const existingUser = await User.findOne({
       $or: [{ email }, { phoneNumber }],
     });
-
     if (existingUser) {
       const error = new Error(
         "User already exists with this email or phone number",
@@ -287,7 +261,6 @@ export const registerUniversitySupervisor = async (userData) => {
     }
 
     const hashedPassword = await hashPassword(password);
-
     const verificationToken = generateVerificationToken();
 
     const newUser = new User({
@@ -308,24 +281,15 @@ export const registerUniversitySupervisor = async (userData) => {
     });
 
     await newUniSupervisor.save({ session });
-
     await session.commitTransaction();
     session.endSession();
 
-    // Send verification email (non-blocking)
+    // ── Observer : publish au lieu d'appel direct email ──
     try {
-      await sendVerificationEmail({
-        to: savedUser.email,
-        userName: savedUser.fullName,
-        verificationToken: savedUser.verificationToken,
-      });
+      await EventBus.publish("USER_REGISTERED", { user: savedUser });
       console.log(`✅ Verification email sent to ${savedUser.email}`);
     } catch (emailError) {
-      console.error(
-        `⚠️ Failed to send verification email to ${savedUser.email}:`,
-        emailError.message,
-      );
-      // Don't throw error - registration was successful, email is secondary
+      console.error(`⚠️ Email error: ${emailError.message}`);
     }
 
     return {
@@ -347,17 +311,14 @@ export const registerUniversitySupervisor = async (userData) => {
 
 export const verifyEmail = async (token) => {
   const user = await User.findOne({ verificationToken: token });
-
   if (!user) {
     const error = new Error("Invalid verification token");
     error.status = 400;
     throw error;
   }
-
   user.isVerified = true;
   user.verificationToken = null;
   await user.save();
-
   return {
     success: true,
     message: "Email verified successfully! Welcome aboard!",
@@ -370,7 +331,6 @@ export const login = async (loginData) => {
   const user = await User.findOne({ email, isActive: true }).select(
     "+password",
   );
-
   if (!user) {
     const error = new Error("Invalid email or password");
     error.status = 401;
@@ -378,16 +338,12 @@ export const login = async (loginData) => {
   }
 
   if (!user.isVerified) {
+    // ── Observer : publish au lieu d'appel direct ──
     try {
-      await resendVerificationEmail(user.email);
-      console.log(
-        `✅ Verification email auto-resent to ${user.email} during login attempt`,
-      );
+      await EventBus.publish("EMAIL_VERIFICATION_REQUESTED", { user });
+      console.log(`✅ Verification email auto-resent to ${user.email}`);
     } catch (emailError) {
-      console.error(
-        `⚠️ Failed to resend verification email to ${user.email}:`,
-        emailError.message,
-      );
+      console.error(`⚠️ Email error: ${emailError.message}`);
     }
 
     const error = new Error(
@@ -398,7 +354,6 @@ export const login = async (loginData) => {
   }
 
   const isPasswordValid = await comparePassword(password, user.password);
-
   if (!isPasswordValid) {
     const error = new Error("Invalid email or password");
     error.status = 401;
@@ -451,43 +406,33 @@ export const login = async (loginData) => {
 
 export const resendVerificationEmail = async (email) => {
   const user = await User.findOne({ email });
-
   if (!user) {
     const error = new Error("User not found with this email");
     error.status = 404;
     throw error;
   }
-
   if (user.isVerified) {
     const error = new Error("Email is already verified");
     error.status = 400;
     throw error;
   }
 
-  // Generate new verification token if not exists
   if (!user.verificationToken) {
     user.verificationToken = generateVerificationToken();
     await user.save();
   }
 
-  // Send verification email
+  // ── Observer : publish au lieu d'appel direct email ──
   try {
-    await sendVerificationEmail({
-      to: user.email,
-      userName: user.fullName,
-      verificationToken: user.verificationToken,
-    });
-
+    await EventBus.publish("EMAIL_VERIFICATION_REQUESTED", { user });
     console.log(`✅ Verification email resent to ${user.email}`);
-
     return {
       success: true,
       message: "Verification email sent successfully. Please check your inbox.",
     };
   } catch (emailError) {
     console.error(
-      `❌ Failed to resend verification email to ${user.email}:`,
-      emailError.message,
+      `❌ Failed to resend verification email: ${emailError.message}`,
     );
     const error = new Error(
       "Failed to send verification email. Please try again later.",
@@ -498,14 +443,6 @@ export const resendVerificationEmail = async (email) => {
 };
 
 export const logout = async (userId) => {
-  // In a production environment, you would typically:
-  // 1. Add the token to a blacklist
-  // 2. Store blacklisted tokens in Redis
-  // 3. Check blacklist during token verification
-
-  // For now, we'll just return success
-  // The client should remove tokens from storage
-
   return {
     success: true,
     message: `${userId} Logged out successfully`,
@@ -515,28 +452,21 @@ export const logout = async (userId) => {
 export const refreshAccessToken = async (refreshToken) => {
   try {
     const payload = jwt.verify(refreshToken, JWT_SECRET);
-
     const user = await User.findById(payload.userId);
-
     if (!user || !user.isActive) {
       const error = new Error("User not found or inactive");
       error.status = 401;
       throw error;
     }
-
-    // Generate new access token
     const newAccessToken = signAccessToken({
       userId: user._id,
       email: user.email,
       role: user.role,
     });
-
     return {
       success: true,
       message: "Token refreshed successfully",
-      data: {
-        accessToken: newAccessToken,
-      },
+      data: { accessToken: newAccessToken },
     };
   } catch {
     const err = new Error("Invalid refresh token");
@@ -546,44 +476,30 @@ export const refreshAccessToken = async (refreshToken) => {
 };
 
 export const requestPasswordReset = async (email) => {
-  // Always respond with a generic message to avoid email enumeration
   const genericResponse = {
     success: true,
     message: "If the email exists, a password reset link has been sent",
   };
 
   const user = await User.findOne({ email, isActive: true });
+  if (!user) return genericResponse;
 
-  if (!user) {
-    // Don't reveal if email exists or not for security
-    return genericResponse;
-  }
-
-  // Generate password reset token
   const resetToken = generateVerificationToken();
-  const resetTokenExpiry = Date.now() + 30 * 60 * 1000; // 30 minutes from now
-  // Store reset token and expiration (30 minutes)
+  const resetTokenExpiry = Date.now() + 30 * 60 * 1000;
   user.passwordResetToken = resetToken;
   user.passwordResetExpires = new Date(resetTokenExpiry);
-
   await user.save();
 
-  // Je vais supprimer sendPasswordResetEmail
+  // ── Observer : publish au lieu d'appel direct email ──
   try {
     await EventBus.publish("PASSWORD_RESET_REQUESTED", { user, resetToken });
-
     console.log(`✅ Password reset email sent to ${user.email}`);
   } catch (emailError) {
-    // Do not reveal email send failures to avoid user enumeration or leakage
-    console.error(
-      `⚠️ Failed to send password reset email to ${user.email}:`,
-      emailError.message,
-    );
+    console.error(`⚠️ Email error: ${emailError.message}`);
   }
 
-  // In development, optionally include token in response for local testing
   return process.env.NODE_ENV === "development"
-    ? { ...genericResponse, resetToken: resetToken }
+    ? { ...genericResponse, resetToken }
     : genericResponse;
 };
 
@@ -600,10 +516,7 @@ export const resetPassword = async (resetToken, newPassword) => {
     throw error;
   }
 
-  // Hash the new password
   const hashedPassword = await hashPassword(newPassword);
-
-  // Update user password and clear reset token (single-use)
   user.password = hashedPassword;
   user.passwordResetToken = null;
   user.passwordResetExpires = null;

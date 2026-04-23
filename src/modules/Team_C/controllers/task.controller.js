@@ -159,7 +159,8 @@ export const validateTaskStatus = async (req, res) => {
       return res.status(400).json({ message: "Task ID is required." });
     }
 
-    const task = await taskService.validateTaskStatus(id, req.body);
+    const validatorRole = req.user.role; // "CompSupervisor" | "UniSupervisor"
+    const task = await taskService.validateTaskStatus(id, req.body, validatorRole);
     res.status(200).json({ message: "Task validated successfully", task });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Project from "../models/project.model.js";
 import Student from "../../Authentication/models/student.model.js";
+import { ProjectFactory } from "../../../factories/ProjectFactory.js";
 
 export const createProject = async (projectData, studentId) => {
   const session = await mongoose.startSession();
@@ -8,16 +9,6 @@ export const createProject = async (projectData, studentId) => {
   
   try {
     const { title, description, startDate, endDate, contributors = [] } = projectData;
-
-    // Validate dates
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    if (end <= start) {
-      const error = new Error("End date must be after start date");
-      error.status = 400;
-      throw error;
-    }
 
     // Check if student already has a project
     const student = await Student.findById(studentId).session(session);
@@ -72,15 +63,13 @@ export const createProject = async (projectData, studentId) => {
       validatedContributors = uniqueContributors;
     }
 
-    // Create the project
-    const newProject = new Project({
+    // Factory Method pattern (GoF p.107) — création et validation déléguées
+    const newProject = ProjectFactory.create({
       title,
-      description: description || '',
-      startDate: start,
-      endDate: end,
+      description,
+      startDate,
+      endDate,
       contributors: [studentId, ...validatedContributors],
-      sprints: [],
-      reports: []
     });
 
     const savedProject = await newProject.save({ session });

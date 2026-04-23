@@ -12,25 +12,28 @@ import teamDRouter from "./src/modules/Team_D/index.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./src/shared/config/swagger.js";
 import cors from "cors";
+
+// ── Pattern Observer (Membre 5) ──
 import EventBus from "./src/events/EventBus.js";
 import { EmailNotificationObserver } from "./src/events/observers/EmailNotificationObserver.js";
 
 const emailObserver = new EmailNotificationObserver();
-const app = express();
 EventBus.subscribe("USER_REGISTERED", emailObserver);
 EventBus.subscribe("PASSWORD_RESET_REQUESTED", emailObserver);
 EventBus.subscribe("EMAIL_VERIFICATION_REQUESTED", emailObserver);
-
 console.log("[Bootstrap] Observer pattern initialized");
+// ─────────────────────────────────
+
+const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(logger("combined"));
 app.use(cors());
+
 await connectDB();
 
-// Swagger UI at /docs
 app.use(
   "/docs",
   swaggerUi.serve,
