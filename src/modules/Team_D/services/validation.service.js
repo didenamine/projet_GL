@@ -2,8 +2,9 @@ import Validation from "../models/validation.model.js";
 import Task from "../../Team_C/models/task.model.js";
 import Meeting from "../models/meeting.model.js";
 import mongoose from "mongoose";
+import ValidatorFactory from "../../../validators/ValidatorFactory.js";
 
-export const createValidation = async (data, validatorId) => {
+export const createValidation = async (data, validatorId, validatorRole) => {
   const {
     taskId,
     status,
@@ -29,43 +30,21 @@ export const createValidation = async (data, validatorId) => {
     };
   }
 
-  // 2️⃣ Check task exists
-  const task = await Task.findById(taskId);
-  if (!task) {
+  // 2️⃣ Get validator and check authorization
+  const validator = ValidatorFactory.get(validatorRole, validatorId);
+  const isAllowed = await validator.validate({
+    taskId,
+    status,
+    meetingType,
+    meetingReference
+  });
+
+  if (!isAllowed) {
     return {
       success: false,
-      code: 404,
-      message: "Task not found"
+      code: 403,
+      message: "You are not authorized to validate this task"
     };
-  }
-
-  // 3️⃣ Task must be Done
-  if (task.status !== "Done") {
-    return {
-      success: false,
-      code: 400,
-      message: "Task is not marked as 'Done'"
-    };
-  }
-
-  // 4️⃣ If meetingType = reunion → meetingReference must exist
-  if (meetingType === "reunion") {
-    if (!meetingReference || !mongoose.Types.ObjectId.isValid(meetingReference)) {
-      return {
-        success: false,
-        code: 400,
-        message: "meetingReference is required for reunion"
-      };
-    }
-
-    const meeting = await Meeting.findById(meetingReference);
-    if (!meeting) {
-      return {
-        success: false,
-        code: 404,
-        message: "Meeting not found"
-      };
-    }
   }
 
   // 5️⃣ Create validation entry
