@@ -431,3 +431,5 @@ Il :
    - Validations par encadrants.
    - Réunions & rapports.
    - Dashboard & journal.
+
+Minor update
