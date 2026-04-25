@@ -3,7 +3,7 @@ import UserStory from "../modules/Team_B/models/UserStory.model.js";
 
 const VALID_STATUSES        = ["ToDo", "InProgress", "Standby", "Done"];
 const VALID_PRIORITIES_TASK = ["Low", "Medium", "High"];
-const VALID_PRIORITIES_US   = ["highest", "high", "medium", "low", "lowest"];
+const VALID_PRIORITIES_US   = ["grand","highest", "high", "medium", "low", "lowest"];
 
 export class TaskFactory {
 
