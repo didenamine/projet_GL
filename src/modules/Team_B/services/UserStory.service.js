@@ -2,14 +2,11 @@ import mongoose from "mongoose";
 import UserStory from "../models/UserStory.model.js";
 import Sprint from "../../Team_A/models/sprint.model.js";
 import Project from "../../Team_A/models/project.model.js";
-
 import Student from "../../Authentication/models/student.model.js";
-import Task from "../../Team_C/models/task.model.js"
-
-import { TaskFactory } from "../../../factories/TaskFactory.js";
+import Task from "../../Team_C/models/task.model.js";
+import { userStoryCreator } from "../../../factories/UserStoryCreator.js";
 
 // 📌 CREATE USER STORY
-
 export const createUserStory = async (data, studentId) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -17,9 +14,6 @@ export const createUserStory = async (data, studentId) => {
   try {
     const { storyName, description, priority, storyPointEstimate, startDate, dueDate, sprintId } = data;
 
-    /** ----------------------------------------------------
-     * 1. Validate that the student has a project
-     * ---------------------------------------------------- */
     const student = await Student.findById(studentId).session(session);
 
     if (!student) {
@@ -28,16 +22,12 @@ export const createUserStory = async (data, studentId) => {
       throw error;
     }
 
-
     if (!student.project) {
       const error = new Error("Student has no assigned project");
       error.statusCode = 400;
       throw error;
     }
 
-    /** ---------------------------------------------
-     * 2. Validate that sprint exists AND belongs to project
-     * --------------------------------------------- */
     const sprint = await Sprint.findById(sprintId).session(session);
 
     if (!sprint || sprint.deletedAt) {
@@ -46,16 +36,12 @@ export const createUserStory = async (data, studentId) => {
       throw error;
     }
 
-    // Check sprint belongs to student's project
     if (String(sprint.projectId) !== String(student.project)) {
       const error = new Error("Sprint does not belong to your project");
       error.statusCode = 403;
       throw error;
     }
 
-    /** --------------------
-     * 3. Validate UserStoryName doesnt exist in the sprint
-     * -------------------- */
     const existingUserStory = await UserStory.findOne({
       storyName,
       sprintId,
@@ -64,11 +50,12 @@ export const createUserStory = async (data, studentId) => {
 
     if (existingUserStory) {
       const error = new Error("A user story with this name already exists in this sprint");
-      error.statusCode = 409; // Conflict
+      error.statusCode = 409;
       throw error;
     }
 
-    const newUserStory = TaskFactory.createUserStory({
+    // ── GRASP Creator + Factory Method : création et validation déléguées au UserStoryCreator ──
+    const newUserStory = userStoryCreator.create({
       storyName,
       description,
       priority,
@@ -77,12 +64,10 @@ export const createUserStory = async (data, studentId) => {
       dueDate,
       sprintId,
     });
+    // ────────────────────────────────────────────────────────────────────────────────────────────
 
     const savedStory = await newUserStory.save({ session });
 
-    /** --------------------------------------------
-     * 6. Add UserStory reference to sprint
-     * -------------------------------------------- */
     await Sprint.findByIdAndUpdate(
       sprintId,
       { $push: { userStories: savedStory._id } },
@@ -118,18 +103,17 @@ export const createUserStory = async (data, studentId) => {
 // get User Stories for student's project
 export const getUserStories = async (projectId) => {
   try {
-
     if (!projectId) {
-      return res.status(StatusCodes.NOT_FOUND).json({
+      return {
         success: false,
-        message: "No project assigned to your account"
-      });
+        message: "No project assigned to your account",
+        data: []
+      };
     }
 
-    // 1️⃣ Vérifier que le projet existe
     const project = await Project.findOne({ _id: projectId, deletedAt: null }).populate({
       path: 'sprints',
-      match: { deletedAt: null }, // ignorer les sprints supprimés
+      match: { deletedAt: null },
       select: '_id title orderIndex'
     });
 
@@ -141,7 +125,6 @@ export const getUserStories = async (projectId) => {
       };
     }
 
-    // 2️⃣ Récupérer tous les sprints du projet
     const sprintIds = project.sprints.map(s => s._id);
 
     if (sprintIds.length === 0) {
@@ -152,7 +135,6 @@ export const getUserStories = async (projectId) => {
       };
     }
 
-    // 3️⃣ Récupérer toutes les UserStories liées à ces sprints
     const userStories = await UserStory.find({
       sprintId: { $in: sprintIds },
       deletedAt: null
@@ -161,7 +143,7 @@ export const getUserStories = async (projectId) => {
         path: 'sprintId',
         select: 'title'
       })
-      .sort({ startDate: 1 }); // optionnel : trier par date de début
+      .sort({ startDate: 1 });
 
     return {
       success: true,
@@ -179,14 +161,12 @@ export const getUserStories = async (projectId) => {
 
 // get User Stories related to sprint
 export const getUserStoriesRelatedToSprint = async (projectId, sprintId) => {
-  /** 1️⃣ Vérifier que l'étudiant a un projet */
   if (!projectId) {
     const error = new Error("No project assigned to your account");
     error.statusCode = 404;
     throw error;
   }
 
-  /** 2️⃣ Vérifier que le sprint existe */
   const sprint = await Sprint.findById(sprintId);
 
   if (!sprint || sprint.deletedAt) {
@@ -195,14 +175,12 @@ export const getUserStoriesRelatedToSprint = async (projectId, sprintId) => {
     throw error;
   }
 
-  /** 3️⃣ Vérifier que le sprint appartient bien au projet */
   if (String(sprint.projectId) !== String(projectId)) {
     const error = new Error("Sprint does not belong to your project");
     error.statusCode = 403;
     throw error;
   }
 
-  /** 4️⃣ Récupérer user stories avec deletedAt = null */
   const userStories = await UserStory.find({
     sprintId: sprintId,
     deletedAt: null
@@ -237,14 +215,12 @@ export const getUserStoriesRelatedToSprint = async (projectId, sprintId) => {
 
 // get US by ID
 export const getUserStoryByID = async (userStoryId, projectId) => {
-  /** 1️⃣ Vérifier que l'étudiant a un projet */
   if (!projectId) {
-    const error = new Error("1️⃣ No project assigned to your account");
+    const error = new Error("No project assigned to your account");
     error.statusCode = 404;
     throw error;
   }
 
-  /** 2️⃣ Vérifier que la user story existe */
   const userStory = await UserStory.findOne({
     _id: userStoryId,
     deletedAt: null
@@ -256,22 +232,19 @@ export const getUserStoryByID = async (userStoryId, projectId) => {
     throw error;
   }
 
-  /** 3️⃣ Vérifier que le sprint auquel elle appartient existe */
   const sprint = await Sprint.findById(userStory.sprintId).lean();
   if (!sprint || sprint.deletedAt) {
-    const error = new Error("3️⃣ Sprint not found or deleted");
+    const error = new Error("Sprint not found or deleted");
     error.statusCode = 404;
     throw error;
   }
 
-  /** 4️⃣ Vérifier que le sprint appartient bien au projet de l'étudiant */
   if (String(sprint.projectId) !== String(projectId)) {
-    const error = new Error(" 4️⃣ Sprint does not belong to your project");
+    const error = new Error("Sprint does not belong to your project");
     error.statusCode = 403;
     throw error;
   }
 
-  /** 5️⃣ Tout est ok, retourner la user story avec les infos du sprint */
   return {
     success: true,
     message: "User Story retrieved successfully",
@@ -279,10 +252,7 @@ export const getUserStoryByID = async (userStoryId, projectId) => {
   };
 };
 
-
-// UPDATE USER STORY 
-
-
+// UPDATE USER STORY
 export const updateUserStory = async (userStoryId, updateData, studentId) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -298,9 +268,6 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
       sprintId
     } = updateData;
 
-    /** ----------------------------------------------------
-     * 1. Validate that the user story exists and not deleted
-     * ---------------------------------------------------- */
     const userStory = await UserStory.findOne({
       _id: userStoryId,
       deletedAt: null
@@ -312,9 +279,6 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
       throw error;
     }
 
-    /** ----------------------------------------------------
-     * 2. Validate that the student has a project
-     * ---------------------------------------------------- */
     const student = await Student.findById(studentId).session(session);
 
     if (!student) {
@@ -329,9 +293,6 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
       throw error;
     }
 
-    /** ----------------------------------------------------
-     * 3. Validate that the user story belongs to student's project
-     * ---------------------------------------------------- */
     const currentSprint = await Sprint.findOne({
       _id: userStory.sprintId,
       deletedAt: null
@@ -349,9 +310,6 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
       throw error;
     }
 
-    /** ----------------------------------------------------
-     * 4. If sprintId is being changed, validate new sprint
-     * ---------------------------------------------------- */
     let newSprint = null;
     const isSprintChanging = sprintId && String(sprintId) !== String(userStory.sprintId);
 
@@ -367,7 +325,6 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
         throw error;
       }
 
-      // Validate new sprint belongs to the same project
       if (String(newSprint.projectId) !== String(student.project)) {
         const error = new Error("New sprint does not belong to your project");
         error.statusCode = 403;
@@ -375,19 +332,15 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
       }
     }
 
-    /** ----------------------------------------------------
-     * 5. Validate storyName uniqueness (if storyName is being changed)
-     * ---------------------------------------------------- */
     const finalStoryName = storyName || userStory.storyName;
     const finalSprintId = sprintId || userStory.sprintId;
 
-    // Check uniqueness only if storyName OR sprintId is changing
     if (
       (storyName && storyName !== userStory.storyName) ||
       isSprintChanging
     ) {
       const existingUserStory = await UserStory.findOne({
-        _id: { $ne: userStoryId }, // Exclude current user story
+        _id: { $ne: userStoryId },
         storyName: finalStoryName,
         sprintId: finalSprintId,
         deletedAt: null
@@ -402,9 +355,6 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
       }
     }
 
-    /** ----------------------------------------------------
-     * 6. Validate dates
-     * ---------------------------------------------------- */
     const finalStartDate = startDate ? new Date(startDate) : userStory.startDate;
     const finalDueDate = dueDate ? new Date(dueDate) : userStory.dueDate;
 
@@ -414,9 +364,6 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
       throw error;
     }
 
-    /** ----------------------------------------------------
-     * 7. Update user story
-     * ---------------------------------------------------- */
     const updateFields = {};
 
     if (storyName !== undefined) updateFields.storyName = storyName;
@@ -433,18 +380,13 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
       { new: true, session, runValidators: true }
     );
 
-    /** ----------------------------------------------------
-     * 8. Update sprint references if sprint is changing
-     * ---------------------------------------------------- */
     if (isSprintChanging) {
-      // Remove from old sprint
       await Sprint.findByIdAndUpdate(
         userStory.sprintId,
         { $pull: { userStories: userStoryId } },
         { session }
       );
 
-      // Add to new sprint
       await Sprint.findByIdAndUpdate(
         sprintId,
         { $push: { userStories: userStoryId } },
@@ -478,17 +420,12 @@ export const updateUserStory = async (userStoryId, updateData, studentId) => {
   }
 };
 
-
-// DELETE USER STORY (soft delete) 
-
+// DELETE USER STORY (soft delete)
 export const deleteUserStory = async (userStoryId, studentId) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    /** ----------------------------------------------------
-     * 1. Validate that the user story exists and not deleted
-     * ---------------------------------------------------- */
     const userStory = await UserStory.findOne({
       _id: userStoryId,
       deletedAt: null
@@ -500,9 +437,6 @@ export const deleteUserStory = async (userStoryId, studentId) => {
       throw error;
     }
 
-    /** ----------------------------------------------------
-     * 2. Validate that the student has a project
-     * ---------------------------------------------------- */
     const student = await Student.findById(studentId).session(session);
 
     if (!student) {
@@ -517,9 +451,6 @@ export const deleteUserStory = async (userStoryId, studentId) => {
       throw error;
     }
 
-    /** ----------------------------------------------------
-     * 3. Validate that the user story belongs to student's project
-     * ---------------------------------------------------- */
     const sprint = await Sprint.findOne({
       _id: userStory.sprintId,
       deletedAt: null
@@ -536,35 +467,26 @@ export const deleteUserStory = async (userStoryId, studentId) => {
       error.statusCode = 403;
       throw error;
     }
-    /** 4️⃣ Get all task IDs */
+
     const taskIds = userStory.tasks;
 
-    /** 5️⃣ HARD DELETE tasks */
     const deletedTasksResult = await Task.deleteMany(
       { _id: { $in: taskIds } },
       { session }
     );
 
-    /** 6️⃣ Remove task references from user story */
     await UserStory.findByIdAndUpdate(
       userStoryId,
-      { $set: { tasks: [] } },   // ✅ nettoyage total
+      { $set: { tasks: [] } },
       { session }
     );
 
-
-    /** ----------------------------------------------------
-     * 5. Soft delete the user story
-     * ---------------------------------------------------- */
     const deletedUserStory = await UserStory.findByIdAndUpdate(
       userStoryId,
       { $set: { deletedAt: new Date() } },
       { new: true, session }
     );
 
-    /** ----------------------------------------------------
-     * 6. Remove user story reference from sprint
-     * ---------------------------------------------------- */
     await Sprint.findByIdAndUpdate(
       userStory.sprintId,
       { $pull: { userStories: userStoryId } },
@@ -579,7 +501,7 @@ export const deleteUserStory = async (userStoryId, studentId) => {
       data: {
         userStoryId: deletedUserStory._id,
         storyName: deletedUserStory.storyName,
-        deletedTasksCount: deletedTasksResult.modifiedCount,
+        deletedTasksCount: deletedTasksResult.deletedCount,
         deletedAt: deletedUserStory.deletedAt
       }
     };

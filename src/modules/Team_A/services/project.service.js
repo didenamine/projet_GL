@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import Project from "../models/project.model.js";
 import Student from "../../Authentication/models/student.model.js";
-import { ProjectFactory } from "../../../factories/ProjectFactory.js";
+import { projectCreator } from "../../../factories/ProjectCreator.js";
 
 export const createProject = async (projectData, studentId) => {
   const session = await mongoose.startSession();
@@ -10,7 +10,6 @@ export const createProject = async (projectData, studentId) => {
   try {
     const { title, description, startDate, endDate, contributors = [] } = projectData;
 
-    // Check if student already has a project
     const student = await Student.findById(studentId).session(session);
     
     if (!student) {
@@ -28,14 +27,12 @@ export const createProject = async (projectData, studentId) => {
       }
     }
 
-    // Remove studentId from contributors and remove duplicates
     const uniqueContributors = [...new Set(
       contributors
         .map(id => id.toString())
         .filter(id => id !== studentId.toString())
     )];
 
-    // Validate contributors if provided
     let validatedContributors = [];
     if (uniqueContributors.length > 0) {
       const contributorStudents = await Student.find({
@@ -48,7 +45,6 @@ export const createProject = async (projectData, studentId) => {
         throw error;
       }
 
-      // Check if any contributor already has a project
       for (const contributorStudent of contributorStudents) {
         if (contributorStudent.project) {
           const existingProject = await Project.findById(contributorStudent.project).session(session);
@@ -63,25 +59,24 @@ export const createProject = async (projectData, studentId) => {
       validatedContributors = uniqueContributors;
     }
 
-    // Factory Method pattern (GoF p.107) — création et validation déléguées
-    const newProject = ProjectFactory.create({
+    // ── GRASP Creator + Factory Method : création et validation déléguées au ProjectCreator ──
+    const newProject = projectCreator.create({
       title,
       description,
       startDate,
       endDate,
       contributors: [studentId, ...validatedContributors],
     });
+    // ──────────────────────────────────────────────────────────────────────────────────────────
 
     const savedProject = await newProject.save({ session });
 
-    // Update student document with project reference
     await Student.findByIdAndUpdate(
       studentId,
       { project: savedProject._id },
       { session }
     );
 
-    // Update contributors' documents
     if (validatedContributors.length > 0) {
       await Student.updateMany(
         { _id: { $in: validatedContributors } },
@@ -128,7 +123,7 @@ export const getProject = async (projectId) => {
         foreignField: "_id",
         as: "contributorsData",
         pipeline: [{
-          $match: { deletedAt: null } // Filter soft-deleted students
+          $match: { deletedAt: null }
         }]
       }
     },
@@ -212,7 +207,6 @@ export const getProject = async (projectId) => {
 
   const result = project[0];
 
-  // 2. Final date formatting (ISO strings)
   return {
     success: true,
     message: "Project retrieved successfully",
@@ -248,7 +242,6 @@ export const updateProject = async (projectId, updateData) => {
     throw error;
   }
 
-  // Date validation logic
   const newStart = startDate ? new Date(startDate) : project.startDate;
   const newEnd = endDate ? new Date(endDate) : project.endDate;
 
@@ -285,13 +278,9 @@ export const deleteProject = async (projectId) => {
       throw error;
     }
 
-    // Soft delete project
     project.deletedAt = new Date();
     await project.save({ session });
 
-    // Remove project reference from all contributors
-    // We map over contributors and remove the project ID from each student
-    // But we keep the contributors list in the project intact
     if (project.contributors && project.contributors.length > 0) {
       await Student.updateMany(
         { _id: { $in: project.contributors } },
@@ -314,12 +303,10 @@ export const deleteProject = async (projectId) => {
 };
 
 export const getStudentsWithoutProject = async () => {
-  // Get all student IDs that are assigned to projects (in one optimized query)
   const studentsWithProjects = await Project.distinct("contributors", { 
     deletedAt: null 
   });
 
-  // Get students NOT in that list with user details
   const studentsWithoutProject = await Student.aggregate([
     {
       $match: {
@@ -368,11 +355,10 @@ export const addContributors = async ({ projectId, studentIds, requestingStudent
   session.startTransaction();
 
   try {
-    // 1. Validate project existence and permissions ATOMICALLY
     const project = await Project.findOne({
       _id: projectId,
       deletedAt: null,
-      contributors: requestingStudentId // Requester must be existing contributor
+      contributors: requestingStudentId
     }).session(session);
 
     if (!project) {
@@ -381,12 +367,11 @@ export const addContributors = async ({ projectId, studentIds, requestingStudent
       throw error;
     }
 
-    // 2. Validate and filter candidate students in single query
     const validStudents = await Student.aggregate([
       {
         $match: {
           _id: { $in: studentIds.map(id => new mongoose.Types.ObjectId(id)) },
-          project: { $exists: false }, // No assigned project
+          project: { $exists: false },
         }
       },
       {
@@ -407,19 +392,15 @@ export const addContributors = async ({ projectId, studentIds, requestingStudent
       }
     ]).session(session);
 
-    // 3. Identify invalid students for detailed error reporting
     const validStudentIds = validStudents.map(s => s._id.toString());
     const invalidStudents = studentIds.filter(id => !validStudentIds.includes(id));
 
-    // 4. Atomic updates - project and students in single transaction
     if (validStudentIds.length > 0) {
-      // Update project contributors
       await Project.updateOne(
         { _id: projectId },
         { $addToSet: { contributors: { $each: validStudentIds } } }
       ).session(session);
 
-      // Update student project assignments
       await Student.updateMany(
         { _id: { $in: validStudentIds } },
         { $set: { project: projectId } }
@@ -430,7 +411,7 @@ export const addContributors = async ({ projectId, studentIds, requestingStudent
     return {
       success: true,
       message: `Successfully added ${validStudentIds.length} contributors`,
-      invalidStudents // Return for client feedback
+      invalidStudents
     };
   } catch (error) {
     await session.abortTransaction();
@@ -445,11 +426,10 @@ export const removeContributors = async ({ projectId, studentIds, requestingStud
   session.startTransaction();
 
   try {
-    // 1. Validate project existence and permissions ATOMICALLY
     const project = await Project.findOne({
       _id: projectId,
       deletedAt: null,
-      contributors: requestingStudentId // Requester must be existing contributor
+      contributors: requestingStudentId
     })
     .select('contributors')
     .session(session);
@@ -460,7 +440,6 @@ export const removeContributors = async ({ projectId, studentIds, requestingStud
       throw error;
     }
 
-    // 2. Prevent self-removal (critical security constraint)
     const requestingStudentIdStr = requestingStudentId.toString();
     if (studentIds.includes(requestingStudentIdStr)) {
       const error = new Error("You cannot remove yourself from the project");
@@ -468,13 +447,12 @@ export const removeContributors = async ({ projectId, studentIds, requestingStud
       throw error;
     }
 
-    // 3. Validate students to remove in single aggregation
     const projectObjectId = new mongoose.Types.ObjectId(projectId);
     const validStudents = await Student.aggregate([
       {
         $match: {
           _id: { $in: studentIds.map(id => new mongoose.Types.ObjectId(id)) },
-          project: projectObjectId, // Must be assigned to THIS project
+          project: projectObjectId,
           deletedAt: null
         }
       },
@@ -495,17 +473,14 @@ export const removeContributors = async ({ projectId, studentIds, requestingStud
       }
     ]).session(session);
 
-    // 4. Identify invalid students
     const validStudentIds = validStudents.map(s => s._id.toString());
     const invalidStudents = studentIds.filter(id => !validStudentIds.includes(id));
 
-    // 5. Atomic updates - only proceed if valid students exist
     if (validStudentIds.length > 0) {
-      // Update project contributors
       const projectUpdate = await Project.updateOne(
         { 
           _id: projectId,
-          contributors: { $all: validStudentIds } // Ensure all exist before removal
+          contributors: { $all: validStudentIds }
         },
         { $pull: { contributors: { $in: validStudentIds } } }
       ).session(session);
@@ -514,7 +489,6 @@ export const removeContributors = async ({ projectId, studentIds, requestingStud
         throw new Error("Concurrent modification detected - retry operation");
       }
 
-      // Clear project reference from students
       await Student.updateMany(
         { _id: { $in: validStudentIds } },
         { $unset: { project: "" } }
@@ -530,7 +504,6 @@ export const removeContributors = async ({ projectId, studentIds, requestingStud
   } catch (error) {
     await session.abortTransaction();
     
-    // Handle specific transaction errors
     if (error.message.includes("Concurrent modification")) {
       const conflictError = new Error("Project modified by another user. Please refresh and retry.");
       conflictError.status = 409;
