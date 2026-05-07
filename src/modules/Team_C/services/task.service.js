@@ -22,11 +22,7 @@ async function verifyUserStoryExists(userStoryId) {
 
 export const createTask = async (data) => {
   const { title, userStoryId } = data;
-  if (!title || !userStoryId) {
-    const error = new Error("Title and userStoryId are required.");
-    error.status = 400;
-    throw error;
-  }
+  
 
   await verifyUserStoryExists(userStoryId);
 
