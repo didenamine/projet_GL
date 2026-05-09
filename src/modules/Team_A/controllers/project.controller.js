@@ -1,5 +1,4 @@
 import { projectFacade } from "../../facades/index.js";
-import * as projectService from "../services/project.service.js";
 import { StatusCodes } from "http-status-codes";
 
 export const createProject = async (req, res, next) => {
@@ -30,7 +29,7 @@ export const getProject = async (req, res, next) => {
       });
     }
     
-    const result = await projectService.getProject(projectId);
+    const result = await projectFacade.getProject(projectId);
     
     res.status(StatusCodes.OK).json({
       success: result.success,
@@ -54,7 +53,7 @@ export const updateProject = async (req, res, next) => {
       });
     }
 
-    const result = await projectService.updateProject(projectId, updateData);
+    const result = await projectFacade.updateProject(projectId, updateData);
     
     res.status(StatusCodes.OK).json(result);
   } catch (error) {
@@ -73,7 +72,7 @@ export const deleteProject = async (req, res, next) => {
       });
     }
 
-    const result = await projectService.deleteProject(projectId);
+    const result = await projectFacade.deleteProject(projectId);
     
     res.status(StatusCodes.OK).json(result);
   } catch (error) {
@@ -83,7 +82,7 @@ export const deleteProject = async (req, res, next) => {
 
 export const getStudentsWithoutProject = async (req, res, next) => {
   try {
-    const result = await projectService.getStudentsWithoutProject();
+    const result = await projectFacade.getStudentsWithoutProject();
     res.status(StatusCodes.OK).json({
       success: result.success,
       message: result.message,
@@ -113,7 +112,7 @@ export const addContributors = async (req, res, next) => {
       });
     }
 
-    const result = await projectService.addContributors({ projectId, studentIds, requestingStudentId });
+    const result = await projectFacade.addContributors({ projectId, studentIds, requestingStudentId });
     res.status(StatusCodes.OK).json({
       success: result.success,
       message: result.message,
@@ -143,7 +142,7 @@ export const removeContributors = async (req, res, next) => {
       });
     }
     
-    const result = await projectService.removeContributors({ projectId, studentIds, requestingStudentId });
+    const result = await projectFacade.removeContributors({ projectId, studentIds, requestingStudentId });
     res.status(StatusCodes.OK).json({
       success: result.success,
       message: result.message,

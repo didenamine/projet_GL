@@ -27,6 +27,30 @@ class ProjectFacade {
   async generateReport(projectId, dto, studentId, file) {
     return reportService.createReport(studentId, dto, file);
   }
+
+  async getProject(projectId) {
+    return projectService.getProject(projectId);
+  }
+
+  async updateProject(projectId, updateData) {
+    return projectService.updateProject(projectId, updateData);
+  }
+
+  async deleteProject(projectId) {
+    return projectService.deleteProject(projectId);
+  }
+
+  async getStudentsWithoutProject() {
+    return projectService.getStudentsWithoutProject();
+  }
+
+  async addContributors(payload) {
+    return projectService.addContributors(payload);
+  }
+
+  async removeContributors(payload) {
+    return projectService.removeContributors(payload);
+  }
 }
 
 class ArchivableProjectFacade extends ProjectFacade {
