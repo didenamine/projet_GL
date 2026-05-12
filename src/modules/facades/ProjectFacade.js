@@ -1,6 +1,7 @@
 import * as projectService from "../Team_A/services/project.service.js";
 import * as sprintService from "../Team_A/services/sprint.service.js";
 import * as taskService from "../Team_C/services/task.service.js";
+import * as taskHistoryService from "../Team_C/services/taskHistory.service.js";
 import * as reportService from "../Team_B/services/Report.service.js";
 import Project from "../Team_A/models/project.model.js";
 
@@ -24,7 +25,7 @@ class ProjectFacade {
     });
   }
 
-  async generateReport(projectId, dto, studentId, file) {
+  async generateReport(dto, studentId, file) {
     return reportService.createReport(studentId, dto, file);
   }
 
@@ -50,6 +51,46 @@ class ProjectFacade {
 
   async removeContributors(payload) {
     return projectService.removeContributors(payload);
+  }
+
+  async getAllTasks() {
+    return taskService.getAllTasks();
+  }
+
+  async getTaskById(taskId) {
+    return taskService.getTaskById(taskId);
+  }
+
+  async deleteTask(taskId) {
+    return taskService.deleteTask(taskId);
+  }
+
+  async getAllTasksForCompSupervisor(compSupervisorId) {
+    return taskService.getAllTasksForCompSupvisor(compSupervisorId);
+  }
+
+  async getAllTasksForUnivSupervisor(univSupervisorId) {
+    return taskService.getAllTasksForUnivSupervisor(univSupervisorId);
+  }
+
+  async getAllTasksForUserStory(userStoryId) {
+    return taskService.getAllTasksForUserStory(userStoryId);
+  }
+
+  async validateTaskStatus(taskId, validationDto, validatorRole) {
+    return taskService.validateTaskStatus(taskId, validationDto, validatorRole);
+  }
+
+  async makeFullReport(projectId) {
+    return taskService.makeFullReport(projectId);
+  }
+
+  async makeSprintReport(sprintId) {
+    return taskService.makeSprintReport(sprintId);
+  }
+
+  async getTaskHistory(taskId) {
+    return taskHistoryService.getTaskHistory(taskId);
   }
 }
 

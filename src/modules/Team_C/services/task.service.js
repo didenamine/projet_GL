@@ -45,6 +45,11 @@ export const createTask = async (data) => {
   return newTask;
 };
 
+export const getAllTasks = async () => {
+  const tasks = await Task.find();
+  return { message: "Tasks retrieved successfully", tasks };
+};
+
 //function that allows the supervisor to extract all the tasks he is envolved with 
 export const getAllTasksForCompSupvisor = async (compSupervisorId) => {
   const compSupervisor = await CompSupervisor.findById(compSupervisorId).populate('studentsId');
@@ -257,25 +262,42 @@ export const makeFullReport = async (projectId) => {
   return report;
 };
 
-//function that make get a global report for a sprint , same thing as the project report but for a sprint
 export const makeSprintReport = async (sprintId) => {
-  const sprint = await Sprint.findById(sprintId).populate('userStories');
+  const sprint = await Sprint.findById(sprintId);
   if (!sprint) {
     const error = new Error("Sprint not found.");
     error.status = 404;
     throw error;
   }
 
-  // Fetch user stories associated with the sprint
-  const userStories = await UserStory.find({ sprintId: sprintId });
+  const userStories = await UserStory.find({ sprintId: sprint._id });
   const userStoryIds = userStories.map(us => us._id);
-
-  // Fetch tasks associated with these user stories
   const tasks = await Task.find({ userStoryId: { $in: userStoryIds } });
 
   const report = {
     sprint: {
       title: sprint.title,
+      startDate: sprint.startDate,
+      endDate: sprint.endDate,
+    },
+    userStories: userStories.map(userStory => ({
+      name: userStory.storyName,
+      description: userStory.description,
+      priority: userStory.priority,
+      storyPointEstimate: userStory.storyPointEstimate,
+      startDate: userStory.startDate,
+      dueDate: userStory.dueDate,
+    })),
+    tasks: tasks.map(task => ({
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+    }))
+  };
+
+  return report;
+};
       startDate: sprint.startDate,
       endDate: sprint.endDate,
     },
