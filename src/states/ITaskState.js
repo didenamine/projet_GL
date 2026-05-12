@@ -10,7 +10,7 @@ export default class ITaskState {
     return this.name;
   }
 
-  canTransitionTo(_nextStatus) {
+  canTransitionTo() {
     throw new Error("canTransitionTo must be implemented by subclasses.");
   }
 

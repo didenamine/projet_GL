@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { TASK_STATUS_VALUES } from "../../../states/taskStatuses.js";
 
 const taskValidatorSchema = new mongoose.Schema({
   taskId: {
@@ -8,7 +9,7 @@ const taskValidatorSchema = new mongoose.Schema({
   },
   taskStatus: {
     type: String,
-    enum: ["ToDo", "InProgress", "Standby", "Done"],
+    enum: TASK_STATUS_VALUES,
     required: true,
   },
   validatorStatus: {

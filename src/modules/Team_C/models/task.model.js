@@ -1,4 +1,5 @@
 import mongoose from "mongoose"
+import { TASK_STATUS_VALUES } from "../../../states/taskStatuses.js"
 
 const { Schema, model } = mongoose
 
@@ -7,7 +8,7 @@ const taskSchema = new Schema({
   description: { type: String },
   status: {
     type: String,
-    enum: ["ToDo", "InProgress", "Standby", "Done"],
+    enum: TASK_STATUS_VALUES,
     required: true
   },
   priority: {

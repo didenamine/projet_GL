@@ -1,11 +1,11 @@
 import ITaskState from "./ITaskState.js";
 import { TASK_STATUSES } from "./taskStatuses.js";
 
-const ALLOWED_TRANSITIONS = new Set([TASK_STATUSES.STANDBY, TASK_STATUSES.DONE]);
+const ALLOWED_TRANSITIONS = new Set([TASK_STATUSES.IN_PROGRESS]);
 
-export default class InProgressState extends ITaskState {
+export default class StandbyState extends ITaskState {
   constructor() {
-    super(TASK_STATUSES.IN_PROGRESS);
+    super(TASK_STATUSES.STANDBY);
   }
 
   canTransitionTo(nextStatus) {

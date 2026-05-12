@@ -1,7 +1,8 @@
 import Task      from "../modules/Team_C/models/task.model.js";
 import UserStory from "../modules/Team_B/models/UserStory.model.js";
+import { TASK_STATUS_VALUES } from "../states/taskStatuses.js";
 
-const VALID_STATUSES        = ["ToDo", "InProgress", "Standby", "Done"];
+const VALID_STATUSES        = TASK_STATUS_VALUES;
 const VALID_PRIORITIES_TASK = ["Low", "Medium", "High"];
 const VALID_PRIORITIES_US   = ["grand","highest", "high", "medium", "low", "lowest"];
 
