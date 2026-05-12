@@ -13,6 +13,8 @@ import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./src/shared/config/swagger.js";
 import cors from "cors";
 
+import "./src/validators/validators.registry.js";
+
 // ── Pattern Observer (Membre 5) ──
 import EventBus from "./src/events/EventBus.js";
 import { EmailNotificationObserver } from "./src/events/observers/EmailNotificationObserver.js";
