@@ -14,7 +14,7 @@ export const createReport = async (req, res, next) => {
       });
     }
 
-    const result = await projectFacade.generateReport(undefined, req.validatedBody, studentId, req.file);
+    const result = await projectFacade.generateReport(req.validatedBody, studentId, req.file);
 
     res.status(StatusCodes.CREATED).json(result);
   } catch (error) {

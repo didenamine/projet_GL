@@ -1,4 +1,3 @@
-import * as taskService from "../services/task.service.js";
 import { projectFacade } from "../../facades/index.js";
 import CompSupervisor from "../../Authentication/models/compSupervisor.model.js";
 import UniSupervisor from "../../Authentication/models/uniSupervisor.model.js";
@@ -20,8 +19,8 @@ export const createTask = async (req, res) => {
 
 export const getAllTasks = async (req, res) => {
   try {
-    const tasks = await taskService.getAllTasks();
-    res.status(200).json({ message: "Tasks retrieved successfully", tasks });
+    const result = await projectFacade.getAllTasks();
+    res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
@@ -35,28 +34,13 @@ export const getTaskById = async (req, res) => {
       return res.status(400).json({ message: "Task ID is required." });
     }
 
-    const task = await taskService.getTaskById(id);
-    res.status(200).json({ message: "Task retrieved successfully", task });
+    const result = await projectFacade.getTaskById(id);
+    res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
 };
-/*
-export const updateTask = async (req, res) => {
-  try {
-    const { id } = req.params;
 
-    if (!id) {
-      return res.status(400).json({ message: "Task ID is required." });
-    }
-
-    const task = await taskService.updateTask(id, req.body);
-    res.status(200).json({ message: "Task updated successfully", task });
-  } catch (err) {
-    res.status(err.status || 500).json({ message: err.message });
-  }
-};
-*/
 export const deleteTask = async (req, res) => {
   try {
     const { id } = req.params;
@@ -65,7 +49,7 @@ export const deleteTask = async (req, res) => {
       return res.status(400).json({ message: "Task ID is required." });
     }
 
-    const result = await taskService.deleteTask(id);
+    const result = await projectFacade.deleteTask(id);
     res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
@@ -91,8 +75,8 @@ export const getAllTasksForCompSupervisor = async (req, res) => {
       }
     }
     // Fetch tasks for the supervisor
-    const tasks = await taskService.getAllTasksForCompSupvisor(compSupervisorId);
-    res.status(200).json({ message: `${supervisorType} tasks retrieved successfully`, tasks });
+    const result = await projectFacade.getAllTasksForCompSupervisor(compSupervisorId);
+    res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
@@ -117,8 +101,8 @@ export const getAllTasksForUnivSupervisor = async (req, res) => {
       }
     }
     // Fetch tasks for the supervisor
-    const tasks = await taskService.getAllTasksForUnivSupervisor(univSupervisorId);
-    res.status(200).json({ message: `${supervisorType} tasks retrieved successfully`, tasks });
+    const result = await projectFacade.getAllTasksForUnivSupervisor(univSupervisorId);
+    res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
@@ -132,8 +116,8 @@ export const getAllTasksForUserStory = async (req, res) => {
       return res.status(400).json({ message: "User story ID is required." });
     }
 
-    const tasks = await taskService.getAllTasksForUserStory(userStoryId);
-    res.status(200).json({ message: "Tasks retrieved successfully", tasks });
+    const result = await projectFacade.getAllTasksForUserStory(userStoryId);
+    res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
@@ -146,7 +130,7 @@ export const updateTaskStatus = async (req, res) => {
       return res.status(400).json({ message: "Task ID is required." });
     }
     const task = await projectFacade.validateTask(id, req.body, req.user.id);
-    res.status(200).json({ message: "Task updated successfully and waiting for validation", task });
+    res.status(200).json(task);
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
@@ -161,8 +145,8 @@ export const validateTaskStatus = async (req, res) => {
     }
 
     const validatorRole = req.user.role; // "CompSupervisor" | "UniSupervisor"
-    const task = await taskService.validateTaskStatus(id, req.body, validatorRole);
-    res.status(200).json({ message: "Task validated successfully", task });
+    const result = await projectFacade.validateTaskStatus(id, req.body, validatorRole);
+    res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
@@ -175,7 +159,7 @@ export const makeFullReport = async (req, res) => {
     if (!projectId) {
       return res.status(400).json({ message: "Project ID is required." });
     }
-    const report = await taskService.makeFullReport(projectId);
+    const report = await projectFacade.makeFullReport(projectId);
     res.status(200).json({ message: "Report generated successfully", report });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
@@ -188,7 +172,7 @@ export const getSprintReport = async (req, res) => {
     if (!sprintId) {
       return res.status(400).json({ message: "Sprint ID is required." });
     }
-    const report = await taskService.makeSprintReport(sprintId);
+    const report = await projectFacade.makeSprintReport(sprintId);
     res.status(200).json({ message: "Report generated successfully", report });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
