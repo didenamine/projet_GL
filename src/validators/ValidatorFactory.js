@@ -1,17 +1,18 @@
 import CompanyValidator from "./CompanyValidator.js";
 import UniversityValidator from "./UniversityValidator.js";
 
-const validatorMap = {
-  CompSupervisor: CompanyValidator,
-  UniSupervisor: UniversityValidator,
-};
-
 export default class ValidatorFactory {
+  static validators = new Map();
+
+  static register(role, validatorClass) {
+    this.validators.set(role, validatorClass);
+  }
+
   static get(role, supervisorId) {
-    const ValidatorClass = validatorMap[role];
+    const ValidatorClass = this.validators.get(role);
 
     if (!ValidatorClass) {
-      throw new Error(`ValidatorFactory: unsupported role '${role}'.`);
+      throw new Error(`Unsupported validator role: ${role}`);
     }
 
     return new ValidatorClass(supervisorId);
