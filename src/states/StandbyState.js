@@ -2,7 +2,7 @@ import ITaskState from "./ITaskState.js";
 
 const ALLOWED_TRANSITIONS = new Set(["InProgress"]);
 
-export default class StandByState extends ITaskState {
+export default class StandbyState extends ITaskState {
   constructor() {
     super("Standby");
   }

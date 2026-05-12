@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import ITaskState from "../src/states/ITaskState.js";
 import ToDoState from "../src/states/ToDoState.js";
 import InProgressState from "../src/states/InProgressState.js";
-import StandByState from "../src/states/StandByState.js";
+import StandbyState from "../src/states/StandbyState.js";
 import DoneState from "../src/states/DoneState.js";
 import TaskStateManager from "../src/states/TaskStateManager.js";
 
@@ -24,7 +24,7 @@ test("LSP: all concrete states are substitutable for ITaskState", () => {
   const states = [
     new ToDoState(),
     new InProgressState(),
-    new StandByState(),
+    new StandbyState(),
     new DoneState(),
   ];
 
@@ -37,6 +37,12 @@ test("TaskStateManager enforces allowed transitions", () => {
   const task = { status: "ToDo" };
   TaskStateManager.transition(task, "InProgress");
   assert.equal(task.status, "InProgress");
+});
+
+test("TaskStateManager allows InProgress to Standby", () => {
+  const task = { status: "InProgress" };
+  TaskStateManager.transition(task, "Standby");
+  assert.equal(task.status, "Standby");
 });
 
 test("TaskStateManager blocks forbidden transitions", () => {

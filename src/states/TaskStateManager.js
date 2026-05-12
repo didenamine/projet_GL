@@ -1,12 +1,12 @@
 import ToDoState from "./ToDoState.js";
 import InProgressState from "./InProgressState.js";
-import StandByState from "./StandByState.js";
+import StandbyState from "./StandbyState.js";
 import DoneState from "./DoneState.js";
 
 const STATE_FACTORIES = {
   ToDo: () => new ToDoState(),
   InProgress: () => new InProgressState(),
-  Standby: () => new StandByState(),
+  Standby: () => new StandbyState(),
   Done: () => new DoneState(),
 };
 
@@ -34,6 +34,11 @@ function assertTaskLike(task) {
   }
 }
 
+/**
+ * Coordinates task status changes: it is the State pattern context for
+ * transition rules, and can be described as a GRASP Controller because it
+ * receives the status-change request and delegates it to the proper state.
+ */
 export default class TaskStateManager {
   static transition(task, newStatus) {
     assertTaskLike(task);
