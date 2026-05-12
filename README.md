@@ -1,435 +1,307 @@
-# Gestion PFE – Backend (2025‑2026)
-
-Backend d’une application de suivi de PFE “façon Jira” couvrant :
-Projets → Sprints → User Stories → Tâches, validations par encadrants, réunions, versions de rapports et dashboard d’avancement.
+# Gestion PFE - Backend
+
+Backend Express/MongoDB pour une application de suivi de PFE inspiree de Jira :
+projets, sprints, user stories, taches, validations par encadrants, reunions,
+versions de rapports et dashboard d'avancement.
+
+## Sommaire
+
+- [Contexte](#contexte)
+- [Stack technique](#stack-technique)
+- [Fonctionnalites](#fonctionnalites)
+- [Architecture](#architecture)
+- [Design patterns et principes](#design-patterns-et-principes)
+- [Structure du projet](#structure-du-projet)
+- [Installation](#installation)
+- [Execution et tests](#execution-et-tests)
+- [Documentation](#documentation)
+
+## Contexte
+
+Le projet couvre le suivi complet d'un stage PFE :
+
+- un etudiant cree et gere son projet, ses sprints, ses user stories, ses taches,
+  ses reunions et ses rapports ;
+- un encadrant entreprise consulte l'avancement et valide/invalide les taches ;
+- un encadrant universitaire consulte l'avancement, valide/invalide les taches et
+  valide le contenu des reunions.
+
+## Stack technique
+
+- **Runtime** : Node.js avec modules ES
+- **Framework API** : Express.js
+- **Base de donnees** : MongoDB avec Mongoose
+- **Authentification** : JWT, hash de mots de passe avec bcrypt/bcryptjs
+- **Validation d'entrees** : Joi via un middleware commun
+- **Upload** : Multer pour les rapports
+- **Documentation API** : Swagger UI sur `/docs`
+- **Tests** : `node:test`
+- **Lint** : ESLint
+
+## Fonctionnalites
+
+- Authentification et gestion des utilisateurs :
+  inscription et connexion des etudiants, encadrants entreprise et encadrants
+  universitaires, verification email, reset password, JWT access/refresh tokens.
+- Projets et contributeurs :
+  creation, lecture, modification, suppression logique, ajout/retrait de
+  contributeurs et recherche d'etudiants sans projet.
+- Sprints :
+  creation dans la periode du projet, modification, suppression logique et
+  reordonnancement.
+- User stories :
+  CRUD, rattachement a un sprint, contraintes de dates et story points.
+- Taches :
+  CRUD partiel, workflow de statuts, demandes de changement de statut,
+  validation par encadrant, historique des changements et rapports projet/sprint.
+- Rapports :
+  upload de versions, consultation par etudiant ou encadrant, unicite des
+  versions par projet, suppression logique.
+- Reunions et validations :
+  planification, compte rendu, validation universitaire du contenu, validations
+  de taches liees ou hors reunion.
+- Dashboard :
+  progression projet, timeline et vues superviseur/etudiant.
+
+## Architecture
+
+L'application est organisee par modules fonctionnels dans `src/modules/`.
+Chaque module suit une separation simple :
+
+- `routes/` expose les endpoints Express et applique les middlewares.
+- `controllers/` traduit HTTP vers les services.
+- `services/` porte les regles metier et l'orchestration Mongoose.
+- `models/` contient les schemas Mongoose.
+- `validators/` contient les schemas Joi.
+- `index.js` monte les routes du module.
+
+Les elements transverses sont isoles hors modules :
+
+- `src/shared/` : configuration, connexion DB, middlewares, email service et
+  templates.
+- `src/factories/` : creation controlee des entites metier.
+- `src/states/` : workflow de statuts de tache.
+- `src/validators/` : strategies de validation superviseur.
+- `src/events/` : bus d'evenements et observers.
+- `src/modules/facades/` : facade applicative autour des workflows projet.
+- `src/repositories/` : interfaces de repository preparees pour l'inversion de
+  dependance.
+
+Les routes sont montees dans `server.js` avec le prefixe `/api` :
+
+- `/api/auth`
+- `/api/project`
+- `/api/project/sprints`
+- `/api/dashboard`
+- `/api/user-story`
+- `/api/report`
+- `/api/tasks`
+- `/api/meetings`
+- `/api/validations`
+
+## Design Patterns Et Principes
 
----
+### Factory Method
 
-## 1. Contexte & objectifs
+Les factories centralisent la creation et les invariants de base des objets :
 
-- **Contexte** : mini‑projet de 4–5 semaines, backend API uniquement, tests via Postman.
-- **Objectif** : fournir une API REST permettant à un futur frontend React de gérer :
-  - Création et suivi d’un projet PFE et de ses sprints.
-  - User stories et tâches avec workflow complet.
-  - Réunions de suivi (planification + compte rendu + validation).
-  - Versions de rapports de PFE.
-  - Dashboard d’avancement et journal du stage.
-- **Acteurs** :
-  - **Étudiant** : crée et gère projet, sprints, user stories, tâches, réunions, rapports.
-  - **Encadrant entreprise** : consulte et **valide/invalide** l’avancement des tâches.
-  - **Encadrant universitaire** : consulte, **valide/invalide** les tâches et **valide le contenu des réunions**.
+- `src/factories/ProjectFactory.js`
+  - `create()` pour les projets ;
+  - `createSprint()` pour les sprints, avec verification des dates par rapport
+    au projet ;
+  - `createReport()` pour les versions de rapport.
+- `src/factories/TaskFactory.js`
+  - `createUserStory()` pour les user stories ;
+  - `create()` fournit la meme logique de creation controlee pour les taches.
 
----
+Elles evitent de disperser les validations de construction dans les services.
+Aujourd'hui, `ProjectFactory` est utilisee par les services projet, sprint et
+rapport, tandis que `TaskFactory.createUserStory()` est utilisee par le service
+des user stories.
 
-## 2. Technologies
+### State Pattern
 
-- **Runtime:** Node.js & Express.js
-- **Database:** MongoDB & Mongoose
-- **Auth:** JSON Web Tokens (JWT)
-- **Tests d’API** : Postman (collections livrées dans `postman/`).
-- **Structure** :
-  - `src/modules/Team_A` : Projets, Sprints, Dashboard agrégé.
-  - `src/modules/Team_B` : User Stories, Rapports (versions).
-  - `src/modules/Team_C` : Tâches, Workflow, Historique de statuts.
-  - `src/modules/Team_D` : Validations, Réunions, liens vers US/Tâches/Rapports.
+Le workflow des taches est gere dans `src/states/` :
 
----
+- `ITaskState` definit le contrat commun ;
+- `ToDoState`, `InProgressState`, `StandbyState`, `DoneState` representent les
+  etats concrets ;
+- `TaskStateManager` joue le role de contexte et controle les transitions.
 
-## 3. Organisation des équipes
+Transitions autorisees :
 
-- **Équipe A – Authentification & Projets & Sprints (+ Dashboard agrégé projet/sprint)**
-  - Membres : Mohamed Ali Hosni et Mohamed Youssef Ben Tili
-
-- **Équipe B – User Stories & Rapports (versions)**
-  - Membres : Ghaya Ammari et Mongia Bahri
-
-- **Équipe C – Tâches & Workflow (historiques)**
-  - Membres : Mohamed Beldi et Amine Diden
-
-- **Équipe D – Validations & Réunions**
-  - Membres : Malek AbdelKhalek et Adam Kacem
-
----
-
-## 4. Planning & deadlines (livrables intermédiaires)
-
-Chaque équipe dispose de 4 deadlines correspondant aux mêmes périodes, avec des objectifs et livrables adaptés à leurs responsabilités.
-
----
-
-# Équipe A — Projets & Sprints
-
-### **Deadline 1 — 09/11/2025**
-- Created the project structure and established database connection setup with Mongoose.
-- Set up this GitHub repository and our team workflow.
-- Implement authentication routes and middleware, add error handling and validation
-- Developed email service for sending verification and password reset emails.
-- Configured Nodemailer for email transport and created email templates for verification and password reset.
-- Set up environment configuration for sensitive data management.
----
-
-### **Deadline 2 — 16/11/2025**
-- Add project management functionality with CRUD operations and authorization middleware
-- Integrate Swagger for API documentation
----
-
-### **Deadline 3 — 25/11/2025**
-- Add sprint management functionality with CRUD operations and authorization middleware
-- Refactor authentication middleware, and enhance project routes
-- Adjusted project routes to streamline authorization checks and improve code organization.
----
-
-### **Deadline 4 — 07/12/2025**
-- Enhance API documentation with Swagger for various routes
-- Endpoints Dashboard :
-  - État d’avancement global par projet.
-  - État d’avancement par sprint.
-- Journal du stage (fil chronologique unifié) combinant :
-  - Réunions.
-  - Validations.
-  - Changements de statut de tâche.
-  - Dépôts de rapports.
-- Calcul et exposition des “items en Standby” (tâches bloquées).
-- Finalisez toutes les fonctionnalités, complétez le collections Postman et corrigez tous les bugs restants.
-
----
-
-# Équipe B — User Stories & Report Versions
-### **Deadline 1 — 24/11/2025**
-Implémentation du CRUD complet sur les User Stories :
-
-- Création d’une User Story
-
-- Consultation de toutes les User Stories
-
-- Mise à jour d’une User Story
-
-- Suppression d’une User Story
-
-### **Deadline 2 — 30/11/2025**
-- Correction des erreurs liées à la mise à jour des User Stories
-
-- Début de l’implémentation du CRUD des Rapports
-
-
-### **Deadline 3 — 3/12/2025**
-- Finalisation du CRUD des Rapports
-
-- Mise en place de la documentation API avec Swagger 
-
-### **Deadline 4 — 07/12/2025**
-- Finalisation de toutes les fonctionnalités
-
-- Complétion de la collection Postman
-
-- Correction des bugs restants
-
-# Équipe C — Tasks & Workflow
-
-### **Deadline 1 — 23/11/2025**
-- Implement basic Task model.
-
-- Implement Task Model and CRUD operations.
-
-- Implement Task History model.
-
-### **Deadline 2 — 30/11/2025**
-- Create TaskValidator model (status requests from student).
-
-- Implement “status update request” logic (Student requests a change, Status stays pending until supervisor validation)
-
-- New specific GET routes for Task (For specific filter like all Tasks that can be visible for a specific supervisor)
-
-### **Deadline 3 — 03/12/2025**
-- Integrate Task History feature to the workflow (adding new status history when there is an update).
-
-- Implement Task History operational CRUD operations.
-
-- Implement Swagger documentation logic.
-
-- Add reporting generators.
-
-### **Deadline 4 — 07/12/2025**
-- Ensure all Team C functions are done (Fixing bugs if needed).
-
-- Prepare Postman collections.
-
-# Équipe D — Meetings, Validations 
-
-### **Deadline 1 — 24/11/2025**
-- Implement meeting creation (planned date, agenda).
-
-- Add CRUD operations for meetings (create, update, view, delete) restricted to student permissions.
-
-- Implement validation model structure (status, author, date, linked meeting or “hors réunion”).
-
-- Establish linking between meetings and related items (User Stories, Tasks, Reports).
-
-### **Deadline 2 — 30/11/2025**
-- Implement task validation feature (validate/invalidate tasks marked as “Done”).
-
-- Add rules ensuring only enterprise/university supervisors can validate tasks.
-
-- Add meeting completion feature: adding real summary after the meeting.
-
-- Integrate validation logic with meeting references (“linked to meeting” or “hors réunion”).
-
-
-### **Deadline 3 — 3/12/2025**
-- Implement validation workflow for meeting content (university supervisor approval).
-
-- Add API documentation using Swagger for all meetings & validations endpoints.
-
-- Improve authorization middleware to enforce student/supervisor role permissions.
-
-- Add consistency checks between meetings, tasks, user stories and reports (e.g., cannot reference non-existing items).
-
-### **Deadline 4 — 07/12/2025**
-- Finalize all meeting & validation features.
-
-- Complete Postman collection with all endpoints and scenarios.
-
-- Fix remaining bugs and ensure all business rules are fully respected.
-
-## 5. Livrables finaux
-
-Conformément au cahier des charges :
-
-- **API fonctionnelles** couvrant le périmètre :
-  - Projets, Sprints, User Stories, Tâches.
-  - Workflow des tâches avec historique.
-  - Validations de tâches.
-  - Réunions (planification + compte rendu + validation de contenu).
-  - Versions de rapports.
-  - Dashboard d’avancement et journal du stage.
-- **Collections Postman**
-  - Dossier : `postman/`
-- **Diagramme de classe**
-  - Fichier : `docs/diagramme-classe.(png|jpg)`
-
----
-
-## 6. Règles de gestion (rappel)
-
-- **Création / modification de contenu**
-  - Seul l’**étudiant** peut créer :
-    - Projet, sprints, user stories, tâches.
-    - Planifier/modifier les réunions.
-    - Uploader des versions de rapport.
-- **Rôle des encadrants**
-  - Encadrants ne modifient pas le contenu créé par l’étudiant.
-  - Encadrant entreprise et universitaire :
-    - Peuvent **valider/invalider** l’avancement d’une tâche.
-  - Encadrant universitaire :
-    - Valide le **contenu des réunions**.
-- **Validations de tâches**
-  - Ne concernent que les tâches au statut `Done`.
-  - Chaque validation contient obligatoirement :
-    - Statut validé.
-    - Auteur (encadrant).
-    - Date.
-    - Réunion liée (ou valeur spéciale “hors réunion”).
-
----
-
-## 7. Structure du projet (indicative)
-
-```bash
-├──src/
-│    ├── modules/
-│    │    ├── Authentification/
-│    │    │   ├── controllers/
-│    │    │   ├── models/
-│    │    │   ├── routes/
-│    │    │   ├── services/
-│    │    │   ├── utils/
-│    │    │   ├── validators/
-│    │    │   └── index.js
-│    │    ├── Team_A/
-│    │    │   ├── controllers/
-│    │    │   ├── models/
-│    │    │   ├── routes/
-│    │    │   ├── services/
-│    │    │   ├── validators/
-│    │    │   └── index.js
-│    │    ├── Team_B/
-│    │    │   ├── controllers/
-│    │    │   ├── models/
-│    │    │   ├── routes/
-│    │    │   ├── services/
-│    │    │   ├── validators/
-│    │    │   └── index.js
-│    │    ├── Team_C/
-│    │    │   ├── controllers/
-│    │    │   ├── models/
-│    │    │   ├── routes/
-│    │    │   ├── services/
-│    │    │   ├── validators/
-│    │    │   └── index.js
-│    │    └── Team_D/
-│    │        ├── controllers/
-│    │        ├── models/
-│    │        ├── routes/
-│    │        ├── services/
-│    │        ├── validators/
-│    │        └── index.js
-│    └── shared/
-│        ├── config/
-│        ├── db/
-│        ├── middlewares/
-│        ├── services/
-│        └── utils/
-└── server.js
+```text
+ToDo -> InProgress
+InProgress -> Standby
+InProgress -> Done
+Standby -> InProgress
+Done -> aucun changement
 ```
 
-Ce projet utilise une **architecture modulaire (feature-based)** combinée à une approche **MVC légère / clean architecture**.  
-Chaque fonctionnalité est isolée dans un module autonome situé dans `src/modules/`, tandis que les éléments transversaux sont regroupés dans `src/shared/`.
+Le service de taches valide la transition avant de creer une demande de
+validation, puis applique reellement la transition uniquement apres validation
+d'un encadrant.
 
-## Description des dossiers
+### Facade
 
-### `src/`
-Racine du code source de l'application.
+`src/modules/facades/ProjectFacade.js` fournit une entree simplifiee pour les
+workflows projet :
 
----
+- creation de projet ;
+- ajout de sprint ;
+- creation de tache ;
+- validation de statut ;
+- generation de rapport ;
+- operations de consultation, mise a jour, suppression et contribution.
 
-### `src/modules/`
-Chaque dossier représente un **module fonctionnel** (une feature).  
-Chaque module contient :
+Les controllers appellent la facade pour eviter de connaitre directement tous
+les services impliques.
 
-- **controllers/**  
-  Gèrent les requêtes HTTP. Reçoivent `req`, appellent les services et renvoient la réponse.  
-  → *Ils ne contiennent pas de logique métier lourde.*
+### Strategy + Factory
 
-- **services/**  
-  Contiennent la logique métier, les traitements complexes, l'interaction avec les modèles et la base de données.  
-  → *C’est le cœur de l’application.*
+La validation par encadrant utilise une strategie par role :
 
-- **models/**  
-  Définition des entités persistées (ex : schémas Mongoose, ORM, DTOs).  
-  → *Représente les données manipulées par le module.*
+- `IValidator` definit l'algorithme commun de validation ;
+- `CompanyValidator` gere les regles de l'encadrant entreprise ;
+- `UniversityValidator` gere les regles de l'encadrant universitaire ;
+- `ValidatorFactory` choisit la strategie selon le role (`CompSupervisor` ou
+  `UniSupervisor`).
 
-- **routes/**  
-  Exposent les endpoints de l’API et relient les routes aux controllers et middlewares.  
-  → *Couche déclarative du module.*
+Ce design applique le polymorphisme GRASP et prepare l'ajout de nouveaux types
+de validateurs sans modifier les services de taches ou de validations.
 
-- **validators/**  
-  Valident les entrées utilisateurs (body, params, query) via Joi, Zod, Yup ou express-validator.  
-  → *Évitent les données invalides dès l'entrée.*
+### Observer
 
-- **utils/**  
-  Fonctions utilitaires propres au module.
+Le module d'authentification ne contacte plus directement le service email.
+Il publie des evenements via `src/events/EventBus.js` :
 
-- **index.js**  
-  Point d'entrée du module.  
-  Il exporte généralement le router pour être monté automatiquement dans `server.js`.
+- `USER_REGISTERED`
+- `EMAIL_VERIFICATION_REQUESTED`
+- `PASSWORD_RESET_REQUESTED`
 
----
+`EmailNotificationObserver` ecoute ces evenements et delegue l'envoi au service
+email. Le demarrage des observers se fait dans `server.js`.
 
-### `src/shared/`
-Contient les composants **transverses** utilisés par plusieurs modules.
+### ISP, DIP et LSP
 
-- **config/**  
-  Gestion des variables d’environnement et configuration globale de l’application.
+- Les interfaces d'observers (`IEmailObserver`, `ILogObserver`,
+  `INotificationObserver`) separent les contrats au lieu d'imposer une grosse
+  interface unique.
+- `IProjectRepository` et `IUserRepository` documentent les contrats attendus
+  pour isoler les services de details de persistence quand des implementations
+  concretes seront ajoutees.
+- `tests/taskStateLsp.test.js` verifie que tous les etats concrets restent
+  substituables a `ITaskState` et que `TaskStateManager` refuse les transitions
+  invalides.
 
-- **db/**  
-  Connexion à la base de données, initialisation, migrations éventuelles.
+### Contraintes OCL
 
-- **middlewares/**  
-  Middlewares globaux :  
-  - Authentification  
-  - Logging  
-  - Validation générique  
-  - Gestion des erreurs globales  
-  - Rate limiting
+Certaines regles metier sont formalisees comme contraintes OCL puis appliquees
+dans le code :
 
-  → *Ils exécutent du traitement avant ou après les controllers.*
+- une user story doit avoir `dueDate > startDate` ;
+- `storyPointEstimate` doit appartenir a la suite `{1, 2, 3, 5, 8, 13}` ;
+- un sprint doit rester dans la periode de son projet.
 
-- **services/**  
-  Services réutilisables et communs à tous les modules :  
-  mailer, cache, stockage, API externes, file d’attente, etc.
+## Structure Du Projet
 
-- **utils/**  
-  Helpers génériques (formatage, dates, générateurs, encodage…).
+```text
+.
+├── server.js
+├── package.json
+├── docs/
+│   ├── Cahier de charges 2025-2026.pdf
+│   └── Class diagram.png
+├── tests/
+│   └── taskStateLsp.test.js
+└── src/
+    ├── events/
+    │   ├── EventBus.js
+    │   ├── interfaces/
+    │   └── observers/
+    ├── factories/
+    │   ├── ProjectFactory.js
+    │   └── TaskFactory.js
+    ├── modules/
+    │   ├── Authentication/
+    │   ├── Team_A/
+    │   ├── Team_B/
+    │   ├── Team_C/
+    │   ├── Team_D/
+    │   └── facades/
+    ├── repositories/
+    ├── shared/
+    │   ├── config/
+    │   ├── db/
+    │   ├── middlewares/
+    │   ├── services/
+    │   └── utils/
+    ├── states/
+    └── validators/
+```
 
----
+## Installation
 
-### `server.js`
-Point d’entrée du backend.  
-Il :
+### Prerequis
 
-- initialise les middlewares globaux  
-- charge dynamiquement les modules (`src/modules/.../index.js`)  
-- gère les erreurs globales  
-- démarre le serveur HTTP  
+- Node.js 18+
+- npm
+- MongoDB accessible localement ou via une URI distante
 
----
+### Etapes
 
-## Pourquoi cette architecture ?
+```bash
+npm install
+```
 
-- Séparation claire des responsabilités  
-- Scalabilité : chaque module est indépendant  
-- Travail en équipe simplifié : chaque membre peut travailler sur un module  
-- Maintenance facilitée  
-- Réutilisation des services partagés
+Creer un fichier `.env` a la racine :
 
-## 8. Installation & exécution
+```env
+NODE_ENV=development
+PORT=3000
+MONGO_URI=mongodb://localhost:27017/gestion_pfe
+JWT_SECRET=change_me
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+BCRYPT_SALT_ROUNDS=12
+CORS_ORIGIN=http://localhost:3000
+NODEMAILER_EMAIL=
+NODEMAILER_PASSWORD=
+APP_NAME=PFE Management System
+FRONTEND_URL=http://localhost:5173
+EMAIL_FROM_NAME=PFE Management Team
+```
 
-### Prérequis
+## Execution Et Tests
 
-- Node.js (version recommandée : 18+)
-- npm ou yarn
+Demarrer en developpement :
 
-### Installation
+```bash
+npm run dev
+```
 
-1.  **Clone le github repo:**
+Demarrer en mode standard :
 
-    ```bash
-    git clone https://github.com/MA-Hosni/gestion_PFE
-    cd gestion_PFE
-    ```
+```bash
+npm start
+```
 
-2.  **Installer les packages:**
+Lancer les tests :
 
-    ```bash
-    npm install
-    ```
+```bash
+npm test
+```
 
-3.  **Configurez votre fichier `.env`:**
+Lancer ESLint :
 
-    Créez un fichier `.env` dans le dossier racine et ajoutez votre propre chaîne de connexion MongoDB ainsi qu'un secret JWT.
+```bash
+npm run lint
+```
 
-    ```
-    NODE_ENV = development
-    PORT = 3000
-    MONGO_URI = "YOUR_MONGODB_CONNECTION_STRING"
-    JWT_SECRET = "ANY_RANDOM_SECRET_KEY"
-    JWT_ACCESS_EXPIRES_IN = 15m
-    JWT_REFRESH_EXPIRES_IN = 7d
-    BCRYPT_SALT_ROUNDS = 12
-    CORS_ORIGIN = http://localhost:3000
-    NODEMAILER_EMAIL =
-    NODEMAILER_PASSWORD =
-    APP_NAME = "PFE Management System"
-    FRONTEND_URL = "http://localhost:3000"
-    EMAIL_FROM_NAME = "PFE Management Team"
-    ```
+## Documentation
 
-4.  **Start the server:**
-    ```bash
-    npm run dev
-    ```
-    Le serveur fonctionnera sur `http://localhost:3000`. (vous pouvez changer le port pour celui que vous souhaitez)
+- Swagger UI : `http://localhost:3000/docs` si `PORT=3000`
+- Cahier des charges : `docs/Cahier de charges 2025-2026.pdf`
+- Diagramme de classe : `docs/Class diagram.png`
 
----
-
-## 9. Tests avec Postman
-
-1. Importer la collection depuis le dossier `postman/`.
-2. Configurer l’environnement (URL de base, éventuels tokens…).
-3. Exécuter les scénarios de bout en bout :
-   - Création projet → sprint → US → tâches → workflow.
-   - Validations par encadrants.
-   - Réunions & rapports.
-   - Dashboard & journal.
-
-Minor update
+Les fichiers uploades des rapports sont stockes sous `uploads/reports/`.
