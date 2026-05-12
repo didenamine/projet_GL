@@ -147,7 +147,7 @@ export const updateTaskStatus = async (id, data) => {
   }
 
   // Validate transition without mutating persisted task before supervisor validation.
-  TaskStateManager.transition({ status: task.status }, data.status);
+  TaskStateManager.assertCanTransition(task, data.status);
 
   const taskValidator = await TaskValidator.create({
     taskId: id,

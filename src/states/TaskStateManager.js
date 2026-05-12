@@ -2,22 +2,23 @@ import ToDoState from "./ToDoState.js";
 import InProgressState from "./InProgressState.js";
 import StandbyState from "./StandbyState.js";
 import DoneState from "./DoneState.js";
+import { TASK_STATUSES } from "./taskStatuses.js";
 
-const STATE_FACTORIES = {
-  ToDo: () => new ToDoState(),
-  InProgress: () => new InProgressState(),
-  Standby: () => new StandbyState(),
-  Done: () => new DoneState(),
+const STATES = {
+  [TASK_STATUSES.TODO]: new ToDoState(),
+  [TASK_STATUSES.IN_PROGRESS]: new InProgressState(),
+  [TASK_STATUSES.STANDBY]: new StandbyState(),
+  [TASK_STATUSES.DONE]: new DoneState(),
 };
 
 function buildState(status) {
-  const factory = STATE_FACTORIES[status];
-  if (!factory) {
+  const state = STATES[status];
+  if (!state) {
     const error = new Error(`Unknown task status "${status}".`);
     error.status = 400;
     throw error;
   }
-  return factory();
+  return state;
 }
 
 function assertTaskLike(task) {
@@ -40,7 +41,7 @@ function assertTaskLike(task) {
  * receives the status-change request and delegates it to the proper state.
  */
 export default class TaskStateManager {
-  static transition(task, newStatus) {
+  static assertCanTransition(task, newStatus) {
     assertTaskLike(task);
 
     if (typeof newStatus !== "string" || !newStatus.trim()) {
@@ -56,6 +57,20 @@ export default class TaskStateManager {
     buildState(normalizedStatus);
 
     currentState.assertCanTransitionTo(normalizedStatus);
+    return normalizedStatus;
+  }
+
+  static canTransition(task, newStatus) {
+    try {
+      TaskStateManager.assertCanTransition(task, newStatus);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  static transition(task, newStatus) {
+    const normalizedStatus = TaskStateManager.assertCanTransition(task, newStatus);
     task.status = normalizedStatus;
     return task;
   }

@@ -1,4 +1,5 @@
 import Joi from "joi";
+import { TASK_STATUS_VALUES } from "../../../states/taskStatuses.js";
 
 const objectIdPattern = /^[0-9a-fA-F]{24}$/;
 
@@ -11,7 +12,7 @@ export const TaskSchema = Joi.object({
   description: Joi.string().allow('').max(2000).messages({
     'string.max': 'Description cannot exceed 2000 characters'
   }),
-  status: Joi.string().valid("ToDo", "InProgress", "Standby", "Done").required().messages({
+  status: Joi.string().valid(...TASK_STATUS_VALUES).required().messages({
     'any.only': 'Status must be one of [ToDo, InProgress, Standby, Done]',
     'any.required': 'Status is required'
   }),
@@ -35,7 +36,7 @@ export const UpdateTaskSchema = Joi.object({
   description: Joi.string().allow('').max(2000).messages({
     'string.max': 'Description cannot exceed 2000 characters'
   }),
-  status: Joi.string().valid("ToDo", "InProgress", "Standby", "Done").messages({
+  status: Joi.string().valid(...TASK_STATUS_VALUES).messages({
     'any.only': 'Status must be one of [ToDo, InProgress, Standby, Done]'
   }),
   priority: Joi.string().valid("Low", "Medium", "High").messages({
