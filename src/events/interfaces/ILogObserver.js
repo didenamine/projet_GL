@@ -6,4 +6,8 @@ export class ILogObserver extends IEventObserver {
       `${this.constructor.name} must implement notify(eventName, payload)`,
     );
   }
+
+  getLogLevel() {
+    throw new Error(`${this.constructor.name} must implement getLogLevel()`);
+  }
 }

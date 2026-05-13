@@ -6,4 +6,10 @@ export class IEmailObserver extends IEventObserver {
       `${this.constructor.name} must implement notify(eventName, payload)`,
     );
   }
+
+  getSupportedEmailEvents() {
+    throw new Error(
+      `${this.constructor.name} must implement getSupportedEmailEvents()`,
+    );
+  }
 }
