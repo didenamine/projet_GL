@@ -119,6 +119,24 @@ async function validateStoryWithinSprint(userStory) {
   }
 }
 
+async function validateUniqueStoryNamePerSprint(userStory) {
+  if (!userStory.storyName || !userStory.sprintId) return;
+
+  const existing = await mongoose.model("UserStory").findOne({
+    storyName: userStory.storyName,
+    sprintId: userStory.sprintId,
+    _id: { $ne: userStory._id },
+    deletedAt: null,
+  });
+
+  if (existing) {
+    throw new Error(
+      `[OCL][inv] A UserStory with name "${userStory.storyName}" ` +
+        `already exists in this sprint`,
+    );
+  }
+}
+
 function validatePriority(priority) {
   const validPriorities = ["highest", "high", "medium", "low", "lowest"];
   if (!validPriorities.includes(priority)) {
@@ -128,6 +146,13 @@ function validatePriority(priority) {
   }
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// POSTCONDITIONS (post:) — Vérifiées APRÈS la création
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * OCL post: dueDate > startDate (confirmé après création)
+ */
 function validatePostConditionAfterCreate(savedUserStory) {
   const startDate = new Date(savedUserStory.startDate);
   const dueDate = new Date(savedUserStory.dueDate);
@@ -140,6 +165,9 @@ function validatePostConditionAfterCreate(savedUserStory) {
   }
 }
 
+/**
+ * OCL post: storyPointEstimate ∈ Fibonacci
+ */
 function validatePostConditionFibonacci(savedUserStory) {
   const fibonacci = [1, 2, 3, 5, 8, 13];
   const estimate = savedUserStory.storyPointEstimate;
@@ -159,6 +187,8 @@ UserStorySchema.pre("save", async function (next) {
     validateFibonacciStoryPoints(this.storyPointEstimate);
 
     await validateStoryWithinSprint(this);
+
+    await validateUniqueStoryNamePerSprint(this);
 
     validatePriority(this.priority);
 
