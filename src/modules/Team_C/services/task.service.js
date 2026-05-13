@@ -159,7 +159,7 @@ export const updateTaskStatus = async (id, data) => {
     taskStatus: data.status, // This is the proposed new status
     validatorId: data.validatorId,
     comment: data.comment,
-    meetingType:data.meetingType
+    meetingType: data.meetingType
   });
 
   return { message: "Task status validation request created successfully", taskValidator };
@@ -296,25 +296,5 @@ export const makeSprintReport = async (sprintId) => {
     }))
   };
 
-  return report;
-};
-      startDate: sprint.startDate,
-      endDate: sprint.endDate,
-    },
-    userStories: userStories.map(userStory => ({
-      name: userStory.storyName,
-      description: userStory.description,
-      priority: userStory.priority,
-      storyPointEstimate: userStory.storyPointEstimate,
-      startDate: userStory.startDate,
-      dueDate: userStory.dueDate,
-    })),
-    tasks: tasks.map(task => ({
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      priority: task.priority,
-    })),
-  };
   return report;
 };
