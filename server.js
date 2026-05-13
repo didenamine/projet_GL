@@ -18,13 +18,22 @@ import "./src/validators/validators.registry.js";
 // ── Pattern Observer (Membre 5) ──
 import EventBus from "./src/events/EventBus.js";
 import { EmailNotificationObserver } from "./src/events/observers/EmailNotificationObserver.js";
+import { LogObserver } from "./src/events/observers/LogObserver.js";
+import { SMSObserver } from "./src/events/observers/SMSObserver.js";
 
 const emailObserver = new EmailNotificationObserver();
+const logObserver = new LogObserver();
+const smsObserver = new SMSObserver();
+
 EventBus.subscribe("USER_REGISTERED", emailObserver);
+EventBus.subscribe("USER_REGISTERED", logObserver);
+EventBus.subscribe("USER_REGISTERED", smsObserver);
 EventBus.subscribe("PASSWORD_RESET_REQUESTED", emailObserver);
+EventBus.subscribe("PASSWORD_RESET_REQUESTED", logObserver);
 EventBus.subscribe("EMAIL_VERIFICATION_REQUESTED", emailObserver);
+EventBus.subscribe("EMAIL_VERIFICATION_REQUESTED", logObserver);
+
 console.log("[Bootstrap] Observer pattern initialized");
-// ─────────────────────────────────
 
 const app = express();
 

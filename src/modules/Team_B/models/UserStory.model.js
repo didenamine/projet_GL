@@ -1,10 +1,11 @@
 import mongoose from "mongoose";
+
 const { Schema, model } = mongoose;
 
 const UserStorySchema = new Schema(
   {
     storyName: { type: String, required: true, trim: true },
-    description: { type: String, trim: true },
+    description: { type: String, trim: true, default: "" },
     priority: {
       type: String,
       required: true,
@@ -25,7 +26,6 @@ const UserStorySchema = new Schema(
   { timestamps: true },
 );
 
-// Index pour améliorer les recherches
 UserStorySchema.index(
   { priority: 1, deletedAt: 1 },
   {
@@ -34,43 +34,152 @@ UserStorySchema.index(
   },
 );
 
-// Unicité du nom de la UserStory dans un même sprint
 UserStorySchema.index({ storyName: 1, sprintId: 1 }, { unique: true });
 
-// ══════════════════════════════════════════════════════════
-// CONTRAINTES OCL — Membre 5
-// ══════════════════════════════════════════════════════════
+function toISODateString(date) {
+  if (!date) return "null";
+  return date.toISOString().split("T")[0];
+}
 
-// OCL Invariant 2 : dueDate doit être strictement postérieure à startDate
-// context UserStory inv DueDateAfterStartDate:
-//   self.dueDate > self.startDate
-
-// OCL Invariant 3 : storyPointEstimate doit être dans la suite de Fibonacci
-// context UserStory inv ValidStoryPoints:
-//   Set{1,2,3,5,8,13}->includes(self.storyPointEstimate)
-
-UserStorySchema.pre("save", function (next) {
-  // Invariant 2 — dueDate > startDate
-  if (this.dueDate && this.startDate && this.dueDate <= this.startDate) {
-    return next(new Error("[OCL] dueDate must be strictly after startDate"));
+function validateRequiredDates(startDate, dueDate) {
+  if (!startDate || !dueDate) {
+    throw new Error(
+      "[OCL][pre] startDate and dueDate are required for UserStory creation",
+    );
   }
+}
 
-  // Invariant 3 — storyPointEstimate ∈ {1,2,3,5,8,13}
+function validateStoryNameNotEmpty(storyName) {
+  if (!storyName || storyName.trim() === "") {
+    throw new Error("[OCL][pre] storyName cannot be empty");
+  }
+}
+
+function validateSprintIdExists(sprintId) {
+  if (!sprintId) {
+    throw new Error("[OCL][pre] sprintId is required for UserStory");
+  }
+}
+
+function validateDueDateAfterStartDate(startDate, dueDate) {
+  const start = new Date(startDate);
+  const due = new Date(dueDate);
+
+  if (due <= start) {
+    throw new Error(
+      `[OCL][inv] dueDate must be strictly after startDate: ` +
+        `${toISODateString(start)} -> ${toISODateString(due)}`,
+    );
+  }
+}
+
+function validateFibonacciStoryPoints(storyPointEstimate) {
   const fibonacci = [1, 2, 3, 5, 8, 13];
+
   if (
-    this.storyPointEstimate !== undefined &&
-    !fibonacci.includes(this.storyPointEstimate)
+    storyPointEstimate !== undefined &&
+    !fibonacci.includes(storyPointEstimate)
   ) {
-    return next(
-      new Error(
-        "[OCL] storyPointEstimate must be a Fibonacci value: 1, 2, 3, 5, 8, 13",
-      ),
+    throw new Error(
+      "[OCL][inv] storyPointEstimate must be a Fibonacci value: " +
+        fibonacci.join(", "),
+    );
+  }
+}
+
+async function validateStoryWithinSprint(userStory) {
+  if (!userStory.sprintId) return;
+
+  const Sprint = mongoose.model("Sprint");
+  const sprint = await Sprint.findById(userStory.sprintId);
+
+  if (!sprint) {
+    throw new Error(
+      `[OCL][inv] Sprint not found for UserStory: ${userStory.sprintId}`,
     );
   }
 
-  next();
+  const startDate = new Date(userStory.startDate);
+  const sprintStartDate = new Date(sprint.startDate);
+  const dueDate = new Date(userStory.dueDate);
+  const sprintEndDate = new Date(sprint.endDate);
+
+  if (startDate < sprintStartDate) {
+    throw new Error(
+      `[OCL][inv] UserStory startDate (${toISODateString(startDate)}) ` +
+        `must be >= Sprint startDate (${toISODateString(sprintStartDate)})`,
+    );
+  }
+
+  if (dueDate > sprintEndDate) {
+    throw new Error(
+      `[OCL][inv] UserStory dueDate (${toISODateString(dueDate)}) ` +
+        `must be <= Sprint endDate (${toISODateString(sprintEndDate)})`,
+    );
+  }
+}
+
+function validatePriority(priority) {
+  const validPriorities = ["highest", "high", "medium", "low", "lowest"];
+  if (!validPriorities.includes(priority)) {
+    throw new Error(
+      "[OCL][inv] priority must be one of: " + validPriorities.join(", "),
+    );
+  }
+}
+
+function validatePostConditionAfterCreate(savedUserStory) {
+  const startDate = new Date(savedUserStory.startDate);
+  const dueDate = new Date(savedUserStory.dueDate);
+
+  if (dueDate <= startDate) {
+    throw new Error(
+      `[OCL][post] After creation: dueDate must be strictly after startDate. ` +
+        `Got: start=${toISODateString(startDate)}, due=${toISODateString(dueDate)}`,
+    );
+  }
+}
+
+function validatePostConditionFibonacci(savedUserStory) {
+  const fibonacci = [1, 2, 3, 5, 8, 13];
+  const estimate = savedUserStory.storyPointEstimate;
+
+  if (estimate !== undefined && !fibonacci.includes(estimate)) {
+    throw new Error(
+      `[OCL][post] After creation: storyPointEstimate must be a Fibonacci value. ` +
+        `Got: ${estimate}`,
+    );
+  }
+}
+
+UserStorySchema.pre("save", async function (next) {
+  try {
+    validateDueDateAfterStartDate(this.startDate, this.dueDate);
+
+    validateFibonacciStoryPoints(this.storyPointEstimate);
+
+    await validateStoryWithinSprint(this);
+
+    validatePriority(this.priority);
+
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
-// ══════════════════════════════════════════════════════════
+UserStorySchema.statics.createWithOCL = async function (userStoryData) {
+  validateStoryNameNotEmpty(userStoryData.storyName);
+  validateRequiredDates(userStoryData.startDate, userStoryData.dueDate);
+  validateSprintIdExists(userStoryData.sprintId);
+
+  const userStory = new this(userStoryData);
+  const savedUserStory = await userStory.save();
+
+  validatePostConditionAfterCreate(savedUserStory);
+  validatePostConditionFibonacci(savedUserStory);
+
+  return savedUserStory;
+};
 
 export default model("UserStory", UserStorySchema);
